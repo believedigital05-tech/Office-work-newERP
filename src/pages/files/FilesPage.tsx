@@ -43,7 +43,7 @@ import Stack from '@mui/material/Stack';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import { supabase } from '../../lib/supabase';
-import type { PhysicalFile, Cabinet, Client, Employee, FinancialYear, AssessmentYear } from '../../types';
+import type { PhysicalFile, Cabinet, Client, Employee } from '../../types';
 import PageHeader from '../../components/common/PageHeader';
 import StatusChip from '../../components/common/StatusChip';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
@@ -51,6 +51,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { logAudit } from '../../lib/audit';
 import { format } from 'date-fns';
 import FileViewDialog from '../../components/files/FileViewDialog';
+import PdfExportDialog, { type PdfColumn, type PdfRow } from '../../components/common/PdfExportDialog';
 
 const STATUS_OPTIONS = ['all', 'available', 'in_use', 'sent_outside', 'archived', 'missing', 'disposed'];
 
@@ -72,8 +73,8 @@ export default function FilesPage() {
   const [subjectSearch, setSubjectSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [clientFilter, setClientFilter] = useState('all');
-  const [ayFilter, setAyFilter] = useState('all');
-  const [fyFilter, setFyFilter] = useState('all');
+  const [ayFilter, setAyFilter] = useState('');
+  const [fyFilter, setFyFilter] = useState('');
   const [cabinetFilter, setCabinetFilter] = useState('all');
   const [holderFilter, setHolderFilter] = useState('all');
   const [page, setPage] = useState(0);
@@ -92,8 +93,7 @@ export default function FilesPage() {
   const [printing, setPrinting] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [viewFileId, setViewFileId] = useState<string | null>(null);
-  const [fyOptions, setFyOptions] = useState<FinancialYear[]>([]);
-  const [ayOptions, setAyOptions] = useState<AssessmentYear[]>([]);
+  const [pdfOpen, setPdfOpen] = useState(false);
 
   const canEdit = profile?.role === 'admin' || profile?.role === 'manager';
 
@@ -102,12 +102,13 @@ export default function FilesPage() {
     let query = supabase.from('physical_files')
       .select('*, client:clients(client_name,client_id), cabinet:cabinets(cabinet_name), current_holder:employees(full_name)', { count: 'exact' })
       .eq('is_deleted', false)
+      .neq('status', 'archived')
       .order('created_at', { ascending: false })
       .range(page * rowsPerPage, (page + 1) * rowsPerPage - 1);
     if (statusFilter !== 'all') query = query.eq('status', statusFilter);
     if (clientFilter !== 'all') query = query.eq('client_id', clientFilter);
-    if (ayFilter !== 'all') query = query.eq('assessment_year', ayFilter);
-    if (fyFilter !== 'all') query = query.eq('financial_year', fyFilter);
+    if (ayFilter) query = query.ilike('assessment_year', `%${ayFilter}%`);
+    if (fyFilter) query = query.ilike('financial_year', `%${fyFilter}%`);
     if (cabinetFilter !== 'all') query = query.eq('cabinet_id', cabinetFilter);
     if (holderFilter !== 'all') query = query.eq('current_holder_id', holderFilter);
     if (search) query = query.or(`file_name.ilike.%${search}%,file_id.ilike.%${search}%,file_number.ilike.%${search}%`);
@@ -124,8 +125,6 @@ export default function FilesPage() {
     supabase.from('cabinets').select('*').eq('is_deleted', false).order('cabinet_name').then(r => setCabinets(r.data ?? []));
     supabase.from('clients').select('id, client_name, client_id').eq('is_deleted', false).eq('status', 'active').order('client_name').then(r => setClients((r.data ?? []) as Client[]));
     supabase.from('employees').select('*').eq('status', 'active').order('full_name').then(r => setEmployees(r.data ?? []));
-    supabase.from('financial_years').select('*').order('start_year', { ascending: false }).then(r => setFyOptions((r.data ?? []) as FinancialYear[]));
-    supabase.from('assessment_years').select('*').order('start_year', { ascending: false }).then(r => setAyOptions((r.data ?? []) as AssessmentYear[]));
   }, []);
 
   function openEdit(file: PhysicalFile | null) {
@@ -192,14 +191,14 @@ export default function FilesPage() {
     setSubjectSearch('');
     setStatusFilter('all');
     setClientFilter('all');
-    setAyFilter('all');
-    setFyFilter('all');
+    setAyFilter('');
+    setFyFilter('');
     setCabinetFilter('all');
     setHolderFilter('all');
     setPage(0);
   }
 
-  const hasActiveFilters = search || subjectSearch || statusFilter !== 'all' || clientFilter !== 'all' || ayFilter !== 'all' || fyFilter !== 'all' || cabinetFilter !== 'all' || holderFilter !== 'all';
+  const hasActiveFilters = search || subjectSearch || statusFilter !== 'all' || clientFilter !== 'all' || ayFilter || fyFilter || cabinetFilter !== 'all' || holderFilter !== 'all';
 
   function buildPrintHtml(title: string, sections: { heading: string; rows: PhysicalFile[] }[]): string {
     const today = format(new Date(), 'dd MMM yyyy');
@@ -249,13 +248,14 @@ export default function FilesPage() {
         const { data } = await supabase.from('physical_files')
           .select('*, client:clients(client_name,client_id), cabinet:cabinets(cabinet_name), current_holder:employees(full_name)')
           .eq('is_deleted', false)
+          .neq('status', 'archived')
           .order('created_at', { ascending: false });
         allFiles = (data as PhysicalFile[]) ?? [];
         let filtered = allFiles;
         if (statusFilter !== 'all') filtered = filtered.filter(f => f.status === statusFilter);
         if (clientFilter !== 'all') filtered = filtered.filter(f => f.client_id === clientFilter);
-        if (ayFilter !== 'all') filtered = filtered.filter(f => f.assessment_year === ayFilter);
-        if (fyFilter !== 'all') filtered = filtered.filter(f => f.financial_year === fyFilter);
+        if (ayFilter) { const s = ayFilter.toLowerCase(); filtered = filtered.filter(f => (f.assessment_year ?? '').toLowerCase().includes(s)); }
+        if (fyFilter) { const s = fyFilter.toLowerCase(); filtered = filtered.filter(f => (f.financial_year ?? '').toLowerCase().includes(s)); }
         if (cabinetFilter !== 'all') filtered = filtered.filter(f => f.cabinet_id === cabinetFilter);
         if (holderFilter !== 'all') filtered = filtered.filter(f => f.current_holder_id === holderFilter);
         if (search) {
@@ -273,8 +273,8 @@ export default function FilesPage() {
         if (search) filterDesc.push(`Name/No: "${search}"`);
         if (subjectSearch) filterDesc.push(`Subject: "${subjectSearch}"`);
         if (clientFilter !== 'all') filterDesc.push(`Client: ${clients.find(c => c.id === clientFilter)?.client_name ?? ''}`);
-        if (ayFilter !== 'all') filterDesc.push(`AY: ${ayFilter}`);
-        if (fyFilter !== 'all') filterDesc.push(`FY: ${fyFilter}`);
+        if (ayFilter) filterDesc.push(`AY: ${ayFilter}`);
+        if (fyFilter) filterDesc.push(`FY: ${fyFilter}`);
         if (statusFilter !== 'all') filterDesc.push(`Status: ${statusFilter}`);
         if (cabinetFilter !== 'all') filterDesc.push(`Cabinet: ${cabinets.find(c => c.id === cabinetFilter)?.cabinet_name ?? ''}`);
         if (holderFilter !== 'all') filterDesc.push(`Holder: ${employees.find(e => e.id === holderFilter)?.full_name ?? ''}`);
@@ -285,6 +285,7 @@ export default function FilesPage() {
         const { data } = await supabase.from('physical_files')
           .select('*, client:clients(client_name,client_id), cabinet:cabinets(cabinet_name), current_holder:employees(full_name)')
           .eq('is_deleted', false)
+          .neq('status', 'archived')
           .order('created_at', { ascending: false });
         allFiles = (data as PhysicalFile[]) ?? [];
         const sections: { heading: string; rows: PhysicalFile[] }[] = [];
@@ -331,6 +332,7 @@ export default function FilesPage() {
         action={!isMobile ? (
           <Stack direction="row" spacing={1}>
             <Button startIcon={<PrintIcon />} variant="outlined" onClick={() => setPrintOpen(true)}>Print</Button>
+            <Button startIcon={<PrintIcon />} variant="outlined" onClick={() => setPdfOpen(true)}>Export PDF</Button>
             {canEdit && <Button startIcon={<AddIcon />} variant="contained" onClick={() => openEdit(null)}>Add File</Button>}
           </Stack>
         ) : undefined}
@@ -357,14 +359,8 @@ export default function FilesPage() {
               <MenuItem value="all">All Clients</MenuItem>
               {clients.map(c => <MenuItem key={c.id} value={c.id}>{c.client_name}</MenuItem>)}
             </TextField>
-            <TextField select value={ayFilter} onChange={e => { setAyFilter(e.target.value); setPage(0); }} size="small" label="AY" sx={{ minWidth: 110 }}>
-              <MenuItem value="all">All AY</MenuItem>
-              {ayOptions.map(ay => <MenuItem key={ay.id} value={ay.label}>{ay.label}</MenuItem>)}
-            </TextField>
-            <TextField select value={fyFilter} onChange={e => { setFyFilter(e.target.value); setPage(0); }} size="small" label="FY" sx={{ minWidth: 110 }}>
-              <MenuItem value="all">All FY</MenuItem>
-              {fyOptions.map(fy => <MenuItem key={fy.id} value={fy.label}>{fy.label}</MenuItem>)}
-            </TextField>
+            <TextField placeholder="Filter AY..." value={ayFilter} onChange={e => { setAyFilter(e.target.value); setPage(0); }} size="small" label="AY" sx={{ minWidth: 110 }} />
+            <TextField placeholder="Filter FY..." value={fyFilter} onChange={e => { setFyFilter(e.target.value); setPage(0); }} size="small" label="FY" sx={{ minWidth: 110 }} />
             <TextField select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(0); }} size="small" label="Status" sx={{ minWidth: 130 }}>
               {STATUS_OPTIONS.map(s => <MenuItem key={s} value={s}>{s === 'all' ? 'All Status' : s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</MenuItem>)}
             </TextField>
@@ -499,16 +495,14 @@ export default function FilesPage() {
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField select label="AY" value={form.assessment_year} onChange={e => setForm(p => ({ ...p, assessment_year: e.target.value }))} fullWidth size="small">
-                <MenuItem value="">-- None --</MenuItem>
-                {ayOptions.map(ay => <MenuItem key={ay.id} value={ay.label}>{ay.label}</MenuItem>)}
-              </TextField>
+              <TextField label="AY (e.g. 2025-26)" value={form.assessment_year} onChange={e => setForm(p => ({ ...p, assessment_year: e.target.value }))} fullWidth size="small" placeholder="2025-26"
+                error={!!form.assessment_year && !/^\d{4}-\d{2}$/.test(form.assessment_year)}
+                helperText={!!form.assessment_year && !/^\d{4}-\d{2}$/.test(form.assessment_year) ? 'Enter AY in format 2025-26' : ''} />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField select label="FY" value={form.financial_year} onChange={e => setForm(p => ({ ...p, financial_year: e.target.value }))} fullWidth size="small">
-                <MenuItem value="">-- None --</MenuItem>
-                {fyOptions.map(fy => <MenuItem key={fy.id} value={fy.label}>{fy.label}</MenuItem>)}
-              </TextField>
+              <TextField label="FY (e.g. 2025-26)" value={form.financial_year} onChange={e => setForm(p => ({ ...p, financial_year: e.target.value }))} fullWidth size="small" placeholder="2025-26"
+                error={!!form.financial_year && !/^\d{4}-\d{2}$/.test(form.financial_year)}
+                helperText={!!form.financial_year && !/^\d{4}-\d{2}$/.test(form.financial_year) ? 'Enter FY in format 2025-26' : ''} />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField select label="Status" value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value }))} fullWidth size="small">
@@ -582,6 +576,39 @@ export default function FilesPage() {
       </Dialog>
 
       <FileViewDialog open={viewOpen} fileId={viewFileId} onClose={() => setViewOpen(false)} />
+
+      <PdfExportDialog
+        open={pdfOpen}
+        onClose={() => setPdfOpen(false)}
+        title="Physical File Master"
+        columns={[
+          { key: 'file_id', label: 'File ID' },
+          { key: 'file_name', label: 'File Name' },
+          { key: 'file_number', label: 'File Number' },
+          { key: 'file_subject', label: 'Subject' },
+          { key: 'client_name', label: 'Client' },
+          { key: 'assessment_year', label: 'AY' },
+          { key: 'financial_year', label: 'FY' },
+          { key: 'status', label: 'Status' },
+          { key: 'cabinet_name', label: 'Cabinet' },
+          { key: 'shelf', label: 'Shelf' },
+          { key: 'holder', label: 'Holder' },
+        ] as PdfColumn[]}
+        rows={files.map(f => ({
+          file_id: f.file_id,
+          file_name: f.file_name,
+          file_number: f.file_number || '-',
+          file_subject: f.file_subject || '-',
+          client_name: (f.client as { client_name: string } | undefined)?.client_name ?? '-',
+          assessment_year: f.assessment_year || '-',
+          financial_year: f.financial_year || '-',
+          status: f.status.replace(/_/g, ' '),
+          cabinet_name: (f.cabinet as { cabinet_name: string } | undefined)?.cabinet_name ?? '-',
+          shelf: f.shelf || '-',
+          holder: (f.current_holder as { full_name: string } | undefined)?.full_name ?? '-',
+        })) as PdfRow[]}
+        filtersDescription={hasActiveFilters ? 'Active filters applied' : undefined}
+      />
     </Box>
   );
 }

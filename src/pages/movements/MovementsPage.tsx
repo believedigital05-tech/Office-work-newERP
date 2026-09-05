@@ -34,6 +34,7 @@ import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import AssignmentReturnIcon from '@mui/icons-material/AssignmentReturn';
 import DeleteIcon from '@mui/icons-material/Delete';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import type { FileMovement, PhysicalFile, Employee } from '../../types';
 import PageHeader from '../../components/common/PageHeader';
@@ -42,6 +43,8 @@ import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { useAuth } from '../../contexts/AuthContext';
 import { logAudit } from '../../lib/audit';
 import { format, isPast } from 'date-fns';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import PdfExportDialog, { type PdfColumn, type PdfRow } from '../../components/common/PdfExportDialog';
 
 const STATUS_OPTIONS = ['all', 'out', 'returned', 'overdue'];
 
@@ -66,6 +69,9 @@ export default function MovementsPage() {
   const [filesLoading, setFilesLoading] = useState(false);
   const [form, setForm] = useState({ file_id: '', taken_by_id: '', purpose: '', taken_date: new Date().toISOString().split('T')[0], expected_return_date: '', remarks: '' });
   const [returnForm, setReturnForm] = useState({ returned_by_id: '', received_by_id: '', returned_date: new Date().toISOString().split('T')[0], return_remarks: '' });
+  const [viewMovement, setViewMovement] = useState<FileMovement | null>(null);
+  const [pdfOpen, setPdfOpen] = useState(false);
+  const navigate = useNavigate();
 
   const canEdit = profile?.role === 'admin' || profile?.role === 'manager' || profile?.role === 'staff';
 
@@ -172,7 +178,12 @@ export default function MovementsPage() {
       <PageHeader
         title="File Movement Register"
         subtitle={`${total} records`}
-        action={!isMobile && canEdit ? <Button startIcon={<AddIcon />} variant="contained" onClick={() => { setForm({ file_id: '', taken_by_id: '', purpose: '', taken_date: new Date().toISOString().split('T')[0], expected_return_date: '', remarks: '' }); setError(''); loadDialogData(); setDialogOpen(true); }}>Record Movement</Button> : undefined}
+        action={!isMobile ? (
+          <Stack direction="row" spacing={1}>
+            <Button variant="outlined" onClick={() => setPdfOpen(true)}>Export PDF</Button>
+            {canEdit && <Button startIcon={<AddIcon />} variant="contained" onClick={() => { setForm({ file_id: '', taken_by_id: '', purpose: '', taken_date: new Date().toISOString().split('T')[0], expected_return_date: '', remarks: '' }); setError(''); loadDialogData(); setDialogOpen(true); }}>Record Movement</Button>}
+          </Stack>
+        ) : undefined}
       />
 
       <Paper sx={{ mb: 2, p: 2 }}>
@@ -236,7 +247,7 @@ export default function MovementsPage() {
             {loading ? <TableRow><TableCell colSpan={9} align="center" sx={{ py: 4 }}><CircularProgress size={24} /></TableCell></TableRow>
               : movements.length === 0 ? <TableRow><TableCell colSpan={9} align="center" sx={{ py: 4 }}><Typography color="text.secondary">No movements found</Typography></TableCell></TableRow>
               : movements.map(m => (
-                <TableRow key={m.id} hover>
+                <TableRow key={m.id} hover sx={{ cursor: 'pointer' }} onClick={() => setViewMovement(m)}>
                   <TableCell><Typography variant="body2" fontWeight={600} color="primary.main">{m.movement_id}</Typography></TableCell>
                   <TableCell><Typography variant="body2">{(m.file as { file_name: string } | undefined)?.file_name ?? '-'}</Typography></TableCell>
                   <TableCell><Typography variant="caption">{((m.file as { cabinet: { cabinet_name: string } } | undefined)?.cabinet as { cabinet_name: string } | undefined)?.cabinet_name ?? '-'}</Typography></TableCell>
@@ -249,7 +260,8 @@ export default function MovementsPage() {
                     ) : '-'}
                   </TableCell>
                   <TableCell><StatusChip status={m.status} /></TableCell>
-                  <TableCell align="right">
+                  <TableCell align="right" onClick={(e) => e.stopPropagation()}>
+                    <Tooltip title="View"><IconButton size="small" onClick={() => setViewMovement(m)}><VisibilityIcon fontSize="small" /></IconButton></Tooltip>
                     {m.status !== 'returned' && canEdit && (
                       <Tooltip title="Mark Returned">
                         <IconButton size="small" color="success" onClick={() => { setReturnForm({ returned_by_id: '', received_by_id: '', returned_date: new Date().toISOString().split('T')[0], return_remarks: '' }); setReturnDialog({ open: true, movement: m }); }}>
@@ -363,6 +375,58 @@ export default function MovementsPage() {
       </Dialog>
 
       <ConfirmDialog open={deleteDialog.open} title="Delete Movement" message={`Delete movement "${deleteDialog.movement?.movement_id}"?`} requireReason onConfirm={handleDelete} onCancel={() => setDeleteDialog({ open: false, movement: null })} />
+
+      <Dialog open={!!viewMovement} onClose={() => setViewMovement(null)} maxWidth="md" fullWidth>
+        <DialogTitle>Movement Details - {viewMovement?.movement_id}</DialogTitle>
+        <DialogContent dividers>
+          {viewMovement && (
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="overline" color="text.secondary">File</Typography><Typography variant="body2">{(viewMovement.file as { file_name: string } | undefined)?.file_name ?? '-'} ({(viewMovement.file as { file_id: string } | undefined)?.file_id ?? '-'})</Typography></Grid>
+              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="overline" color="text.secondary">Cabinet</Typography><Typography variant="body2">{((viewMovement.file as { cabinet: { cabinet_name: string } } | undefined)?.cabinet as { cabinet_name: string } | undefined)?.cabinet_name ?? '-'}</Typography></Grid>
+              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="overline" color="text.secondary">Taken By</Typography><Typography variant="body2">{(viewMovement.taken_by as { full_name: string } | undefined)?.full_name ?? '-'}</Typography></Grid>
+              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="overline" color="text.secondary">Purpose</Typography><Typography variant="body2">{viewMovement.purpose ?? '-'}</Typography></Grid>
+              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="overline" color="text.secondary">Taken Date</Typography><Typography variant="body2">{format(new Date(viewMovement.taken_date), 'dd MMM yyyy')}</Typography></Grid>
+              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="overline" color="text.secondary">Expected Return</Typography><Typography variant="body2">{viewMovement.expected_return_date ? format(new Date(viewMovement.expected_return_date), 'dd MMM yyyy') : '-'}</Typography></Grid>
+              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="overline" color="text.secondary">Returned Date</Typography><Typography variant="body2">{viewMovement.returned_date ? format(new Date(viewMovement.returned_date), 'dd MMM yyyy') : '-'}</Typography></Grid>
+              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="overline" color="text.secondary">Received By</Typography><Typography variant="body2">{(viewMovement.received_by as { full_name: string } | undefined)?.full_name ?? '-'}</Typography></Grid>
+              <Grid size={12}><Typography variant="overline" color="text.secondary">Remarks</Typography><Typography variant="body2">{viewMovement.remarks ?? '-'}</Typography></Grid>
+              <Grid size={12}><Typography variant="overline" color="text.secondary">Return Remarks</Typography><Typography variant="body2">{viewMovement.return_remarks ?? '-'}</Typography></Grid>
+              <Grid size={12}><Typography variant="overline" color="text.secondary">Status</Typography><StatusChip status={viewMovement.status} /></Grid>
+            </Grid>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setViewMovement(null)}>Close</Button>
+          {viewMovement?.file && <Button variant="outlined" onClick={() => navigate(`/files/${(viewMovement.file as { id?: string }).id ?? ''}`)}>View File</Button>}
+        </DialogActions>
+      </Dialog>
+
+      <PdfExportDialog
+        open={pdfOpen}
+        onClose={() => setPdfOpen(false)}
+        title="File Movement Register"
+        columns={[
+          { key: 'movement_id', label: 'Movement ID' },
+          { key: 'file_name', label: 'File' },
+          { key: 'cabinet_name', label: 'Cabinet' },
+          { key: 'taken_by', label: 'Taken By' },
+          { key: 'purpose', label: 'Purpose' },
+          { key: 'taken_date', label: 'Taken Date' },
+          { key: 'expected_return', label: 'Expected Return' },
+          { key: 'status', label: 'Status' },
+        ] as PdfColumn[]}
+        rows={movements.map(m => ({
+          movement_id: m.movement_id,
+          file_name: (m.file as { file_name: string } | undefined)?.file_name ?? '-',
+          cabinet_name: ((m.file as { cabinet: { cabinet_name: string } } | undefined)?.cabinet as { cabinet_name: string } | undefined)?.cabinet_name ?? '-',
+          taken_by: (m.taken_by as { full_name: string } | undefined)?.full_name ?? '-',
+          purpose: m.purpose ?? '-',
+          taken_date: format(new Date(m.taken_date), 'dd MMM yyyy'),
+          expected_return: m.expected_return_date ? format(new Date(m.expected_return_date), 'dd MMM yyyy') : '-',
+          status: m.status,
+        })) as PdfRow[]}
+        filtersDescription={search ? `Search: ${search}` : undefined}
+      />
     </Box>
   );
 }

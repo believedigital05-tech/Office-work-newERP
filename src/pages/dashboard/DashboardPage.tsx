@@ -58,7 +58,7 @@ export default function DashboardPage() {
     try {
       const [clientsRes, filesRes, movementsRes, activitiesRes, couriersRes, cabinetsRes, allActivitiesRes, clientTypesRes] = await Promise.all([
         supabase.from('clients').select('id, status, created_at, client_name, client_id, client_type:client_types(name)').eq('is_deleted', false).order('created_at', { ascending: false }),
-        supabase.from('physical_files').select('id, status').eq('is_deleted', false),
+        supabase.from('physical_files').select('id, status').eq('is_deleted', false).neq('status', 'archived'),
         supabase.from('file_movements').select('id, status, expected_return_date, file:physical_files(file_name), taken_by:employees(full_name)').eq('is_deleted', false).eq('status', 'out').order('expected_return_date'),
         supabase.from('activities').select('id, title, status, due_date, priority, client:clients(client_name)').eq('is_deleted', false).in('status', ['not_started', 'in_progress', 'on_hold']).order('due_date'),
         supabase.from('couriers').select('id').eq('is_deleted', false).gte('received_date', new Date().toISOString().split('T')[0]),

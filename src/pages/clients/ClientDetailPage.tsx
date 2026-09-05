@@ -64,7 +64,7 @@ export default function ClientDetailPage() {
 
   async function loadRelated() {
     const [filesRes, activitiesRes, couriersRes, notesRes] = await Promise.all([
-      supabase.from('physical_files').select('*, cabinet:cabinets(cabinet_name)').eq('client_id', id!).eq('is_deleted', false),
+      supabase.from('physical_files').select('*, cabinet:cabinets(cabinet_name)').eq('client_id', id!).eq('is_deleted', false).neq('status', 'archived'),
       supabase.from('activities').select('*, activity_type:activity_types(name)').eq('client_id', id!).eq('is_deleted', false).order('created_at', { ascending: false }),
       supabase.from('couriers').select('*, courier_company:courier_companies(name)').eq('client_id', id!).eq('is_deleted', false).order('received_date', { ascending: false }),
       supabase.from('client_notes').select('*').eq('client_id', id!).eq('is_deleted', false).order('created_at', { ascending: false }),

@@ -34,6 +34,8 @@ import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import PdfExportDialog, { type PdfColumn, type PdfRow } from '../../components/common/PdfExportDialog';
 import { supabase } from '../../lib/supabase';
 import type { Courier, Client, Employee, CourierCompany } from '../../types';
 import PageHeader from '../../components/common/PageHeader';
@@ -67,6 +69,8 @@ export default function CouriersPage() {
   const [error, setError] = useState('');
   const defaultForm = { received_date: new Date().toISOString().split('T')[0], direction: 'inbound' as 'inbound' | 'outbound', courier_company_id: '', courier_company_name: '', tracking_number: '', sender: '', receiver: '', client_id: '', parcel_description: '', received_by_id: '', status: 'received', remarks: '' };
   const [form, setForm] = useState(defaultForm);
+  const [viewCourier, setViewCourier] = useState<Courier | null>(null);
+  const [pdfOpen, setPdfOpen] = useState(false);
 
   const canEdit = profile?.role === 'admin' || profile?.role === 'manager' || profile?.role === 'staff';
 
@@ -158,10 +162,14 @@ export default function CouriersPage() {
           !isMobile ? (
             <Box sx={{ display: 'flex', gap: 1 }}>
               <Button variant="outlined" size="small" onClick={handleExport}>Export</Button>
+              <Button variant="outlined" size="small" onClick={() => setPdfOpen(true)}>Export PDF</Button>
               {canEdit && <Button startIcon={<AddIcon />} variant="contained" onClick={() => openEdit(null)}>Add Courier</Button>}
             </Box>
           ) : (
-            <Button variant="outlined" size="small" onClick={handleExport}>Export</Button>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button variant="outlined" size="small" onClick={handleExport}>Export</Button>
+              <Button variant="outlined" size="small" onClick={() => setPdfOpen(true)}>PDF</Button>
+            </Box>
           )
         }
       />
@@ -229,7 +237,7 @@ export default function CouriersPage() {
             {loading ? <TableRow><TableCell colSpan={9} align="center" sx={{ py: 4 }}><CircularProgress size={24} /></TableCell></TableRow>
               : couriers.length === 0 ? <TableRow><TableCell colSpan={9} align="center" sx={{ py: 4 }}><Typography color="text.secondary">No couriers found</Typography></TableCell></TableRow>
               : couriers.map(c => (
-                <TableRow key={c.id} hover>
+                <TableRow key={c.id} hover sx={{ cursor: 'pointer' }} onClick={() => setViewCourier(c)}>
                   <TableCell><Typography variant="body2" fontWeight={600} color="primary.main">{c.courier_id}</Typography></TableCell>
                   <TableCell><Chip label={c.direction === 'outbound' ? 'Outbound' : 'Inbound'} size="small" color={c.direction === 'outbound' ? 'warning' : 'success'} variant="outlined" /></TableCell>
                   <TableCell>{format(new Date(c.received_date), 'dd MMM yy')}</TableCell>
@@ -242,7 +250,8 @@ export default function CouriersPage() {
                   <TableCell>{(c.client as { client_name: string } | undefined)?.client_name ?? '-'}</TableCell>
                   <TableCell><StatusChip status={c.status} /></TableCell>
                   {canEdit && (
-                    <TableCell align="right">
+                    <TableCell align="right" onClick={(e) => e.stopPropagation()}>
+                      <Tooltip title="View"><IconButton size="small" onClick={() => setViewCourier(c)}><VisibilityIcon fontSize="small" /></IconButton></Tooltip>
                       <Tooltip title="Edit"><IconButton size="small" onClick={() => openEdit(c)}><EditIcon fontSize="small" /></IconButton></Tooltip>
                       {profile?.role === 'admin' && <Tooltip title="Delete"><IconButton size="small" color="error" onClick={() => setDeleteDialog({ open: true, courier: c })}><DeleteIcon fontSize="small" /></IconButton></Tooltip>}
                     </TableCell>
@@ -300,6 +309,59 @@ export default function CouriersPage() {
       </Dialog>
 
       <ConfirmDialog open={deleteDialog.open} title="Delete Courier" message={`Delete courier "${deleteDialog.courier?.courier_id}"?`} requireReason onConfirm={handleDelete} onCancel={() => setDeleteDialog({ open: false, courier: null })} />
+
+      <Dialog open={!!viewCourier} onClose={() => setViewCourier(null)} maxWidth="md" fullWidth>
+        <DialogTitle>Courier Details - {viewCourier?.courier_id}</DialogTitle>
+        <DialogContent dividers>
+          {viewCourier && (
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="overline" color="text.secondary">Date</Typography><Typography variant="body2">{format(new Date(viewCourier.received_date), 'dd MMM yyyy')}</Typography></Grid>
+              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="overline" color="text.secondary">Direction</Typography><Typography variant="body2">{viewCourier.direction === 'outbound' ? 'Outbound' : 'Inbound'}</Typography></Grid>
+              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="overline" color="text.secondary">Company</Typography><Typography variant="body2">{(viewCourier.courier_company as { name: string } | undefined)?.name ?? viewCourier.courier_company_name ?? '-'}</Typography></Grid>
+              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="overline" color="text.secondary">Tracking Number</Typography><Typography variant="body2">{viewCourier.tracking_number ?? '-'}</Typography></Grid>
+              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="overline" color="text.secondary">Sender</Typography><Typography variant="body2">{viewCourier.sender ?? '-'}</Typography></Grid>
+              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="overline" color="text.secondary">Receiver</Typography><Typography variant="body2">{viewCourier.receiver ?? '-'}</Typography></Grid>
+              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="overline" color="text.secondary">Client</Typography><Typography variant="body2">{(viewCourier.client as { client_name: string } | undefined)?.client_name ?? '-'}</Typography></Grid>
+              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="overline" color="text.secondary">Received By</Typography><Typography variant="body2">{(viewCourier.received_by as { full_name: string } | undefined)?.full_name ?? '-'}</Typography></Grid>
+              <Grid size={12}><Typography variant="overline" color="text.secondary">Parcel Description</Typography><Typography variant="body2">{viewCourier.parcel_description ?? '-'}</Typography></Grid>
+              <Grid size={12}><Typography variant="overline" color="text.secondary">Remarks</Typography><Typography variant="body2">{viewCourier.remarks ?? '-'}</Typography></Grid>
+              <Grid size={12}><Typography variant="overline" color="text.secondary">Status</Typography><StatusChip status={viewCourier.status} /></Grid>
+            </Grid>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setViewCourier(null)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      <PdfExportDialog
+        open={pdfOpen}
+        onClose={() => setPdfOpen(false)}
+        title="Courier Register"
+        columns={[
+          { key: 'courier_id', label: 'Courier ID' },
+          { key: 'direction', label: 'Direction' },
+          { key: 'date', label: 'Date' },
+          { key: 'company', label: 'Company' },
+          { key: 'tracking', label: 'Tracking' },
+          { key: 'sender', label: 'Sender' },
+          { key: 'receiver', label: 'Receiver' },
+          { key: 'client', label: 'Client' },
+          { key: 'status', label: 'Status' },
+        ] as PdfColumn[]}
+        rows={couriers.map(c => ({
+          courier_id: c.courier_id,
+          direction: c.direction === 'outbound' ? 'Outbound' : 'Inbound',
+          date: format(new Date(c.received_date), 'dd MMM yyyy'),
+          company: (c.courier_company as { name: string } | undefined)?.name ?? c.courier_company_name ?? '-',
+          tracking: c.tracking_number ?? '-',
+          sender: c.sender ?? '-',
+          receiver: c.receiver ?? '-',
+          client: (c.client as { client_name: string } | undefined)?.client_name ?? '-',
+          status: c.status,
+        })) as PdfRow[]}
+        filtersDescription={search ? `Search: ${search}` : undefined}
+      />
     </Box>
   );
 }

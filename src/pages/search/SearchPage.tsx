@@ -17,6 +17,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 
+import PdfExportDialog, { type PdfColumn, type PdfRow } from '../../components/common/PdfExportDialog';
 import SearchIcon from '@mui/icons-material/Search';
 import { supabase } from '../../lib/supabase';
 import PageHeader from '../../components/common/PageHeader';
@@ -38,6 +39,7 @@ export default function SearchPage() {
   const [results, setResults] = useState<SearchResults | null>(null);
   const [tab, setTab] = useState(0);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [pdfOpen, setPdfOpen] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem('recentSearches');
@@ -64,7 +66,7 @@ export default function SearchPage() {
 
     const [clientsRes, filesRes, movementsRes, couriersRes, activitiesRes] = await Promise.all([
       supabase.from('clients').select('id,client_id,client_name,status,pan_number,mobile_number,email').eq('is_deleted', false).or(`client_name.ilike.%${q}%,client_id.ilike.%${q}%,pan_number.ilike.%${q}%,mobile_number.ilike.%${q}%,email.ilike.%${q}%,gst_number.ilike.%${q}%`).limit(20),
-      supabase.from('physical_files').select('id,file_id,file_name,file_subject,status,client:clients(client_name)').eq('is_deleted', false).or(`file_name.ilike.%${q}%,file_id.ilike.%${q}%,file_number.ilike.%${q}%,file_subject.ilike.%${q}%`).limit(20),
+      supabase.from('physical_files').select('id,file_id,file_name,file_subject,status,client:clients(client_name)').eq('is_deleted', false).neq('status', 'archived').or(`file_name.ilike.%${q}%,file_id.ilike.%${q}%,file_number.ilike.%${q}%,file_subject.ilike.%${q}%`).limit(20),
       supabase.from('file_movements').select('id,movement_id,purpose,status,taken_date,file:physical_files(file_name)').eq('is_deleted', false).or(`movement_id.ilike.%${q}%,purpose.ilike.%${q}%`).limit(20),
       supabase.from('couriers').select('id,courier_id,sender,receiver,tracking_number,status,received_date').eq('is_deleted', false).or(`courier_id.ilike.%${q}%,tracking_number.ilike.%${q}%,sender.ilike.%${q}%,receiver.ilike.%${q}%`).limit(20),
       supabase.from('activities').select('id,activity_id,title,status,due_date,client:clients(client_name)').eq('is_deleted', false).or(`title.ilike.%${q}%,activity_id.ilike.%${q}%,notes.ilike.%${q}%`).limit(20),
@@ -93,7 +95,7 @@ export default function SearchPage() {
 
   return (
     <Box>
-      <PageHeader title="Global Search" subtitle="Search across all modules" />
+      <PageHeader title="Global Search" subtitle="Search across all modules" action={<Button variant="outlined" onClick={() => setPdfOpen(true)} disabled={!results}>Export PDF</Button>} />
 
       <Paper sx={{ p: 3, mb: 3 }}>
         <Box component="form" onSubmit={handleSearch} sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
@@ -157,7 +159,7 @@ export default function SearchPage() {
                 <TableHead><TableRow><TableCell>Movement ID</TableCell><TableCell>File</TableCell><TableCell>Purpose</TableCell><TableCell>Date</TableCell><TableCell>Status</TableCell></TableRow></TableHead>
                 <TableBody>
                   {results.movements.length === 0 ? <TableRow><TableCell colSpan={5} align="center">No movements found</TableCell></TableRow>
-                    : results.movements.map(m => <TableRow key={m.id as string} hover>
+                    : results.movements.map(m => <TableRow key={m.id as string} hover sx={{ cursor: 'pointer' }} onClick={() => navigate(`/movements`)}>
                       <TableCell><Typography variant="body2" fontWeight={600}>{m.movement_id as string}</Typography></TableCell>
                       <TableCell>{(m.file as { file_name: string } | undefined)?.file_name ?? '-'}</TableCell>
                       <TableCell>{m.purpose as string ?? '-'}</TableCell>
@@ -173,7 +175,7 @@ export default function SearchPage() {
                 <TableHead><TableRow><TableCell>Courier ID</TableCell><TableCell>Sender</TableCell><TableCell>Receiver</TableCell><TableCell>Tracking</TableCell><TableCell>Status</TableCell></TableRow></TableHead>
                 <TableBody>
                   {results.couriers.length === 0 ? <TableRow><TableCell colSpan={5} align="center">No couriers found</TableCell></TableRow>
-                    : results.couriers.map(c => <TableRow key={c.id as string} hover>
+                    : results.couriers.map(c => <TableRow key={c.id as string} hover sx={{ cursor: 'pointer' }} onClick={() => navigate(`/couriers`)}>
                       <TableCell><Typography variant="body2" fontWeight={600}>{c.courier_id as string}</Typography></TableCell>
                       <TableCell>{c.sender as string ?? '-'}</TableCell>
                       <TableCell>{c.receiver as string ?? '-'}</TableCell>
@@ -224,6 +226,27 @@ export default function SearchPage() {
           </Paper>
         </Box>
       )}
+
+      <PdfExportDialog
+        open={pdfOpen}
+        onClose={() => setPdfOpen(false)}
+        title="Global Search Results"
+        columns={[
+          { key: 'type', label: 'Type' },
+          { key: 'id', label: 'ID' },
+          { key: 'name', label: 'Name/Title' },
+          { key: 'detail', label: 'Detail' },
+          { key: 'status', label: 'Status' },
+        ] as PdfColumn[]}
+        rows={results ? [
+          ...results.clients.map(c => ({ type: 'Client', id: c.client_id as string, name: c.client_name as string, detail: (c.mobile_number as string) ?? '-', status: c.status as string })),
+          ...results.files.map(f => ({ type: 'File', id: f.file_id as string, name: f.file_name as string, detail: (f.file_subject as string) ?? '-', status: f.status as string })),
+          ...results.movements.map(m => ({ type: 'Movement', id: m.movement_id as string, name: (m.file as { file_name: string } | undefined)?.file_name ?? '-', detail: (m.purpose as string) ?? '-', status: m.status as string })),
+          ...results.couriers.map(c => ({ type: 'Courier', id: c.courier_id as string, name: (c.sender as string) ?? '-', detail: (c.tracking_number as string) ?? '-', status: c.status as string })),
+          ...results.activities.map(a => ({ type: 'Activity', id: a.activity_id as string, name: a.title as string, detail: (a.client as { client_name: string } | undefined)?.client_name ?? '-', status: a.status as string })),
+        ] as PdfRow[] : []}
+        filtersDescription={query ? `Search: ${query}` : undefined}
+      />
     </Box>
   );
 }
