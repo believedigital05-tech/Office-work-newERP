@@ -108,9 +108,24 @@ export interface PhysicalFile {
   disposed_at?: string;
   disposed_by?: string;
   dispose_reason?: string;
+  archived_at?: string;
+  archived_by?: string;
+  archive_reason?: string;
+  retention_rule_id?: string;
+  retention_rule_name?: string;
   is_deleted: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface RetentionRule {
+  id: string;
+  name: string;
+  years: number;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+  created_by?: string;
 }
 
 export interface FileMovement {
