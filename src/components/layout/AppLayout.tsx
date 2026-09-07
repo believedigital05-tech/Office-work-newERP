@@ -40,7 +40,7 @@ import LightModeIcon from '@mui/icons-material/LightMode';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import { useAuth } from '../../contexts/AuthContext';
 
-const DRAWER_WIDTH = 240;
+const DRAWER_WIDTH = 256;
 
 interface NavItem {
   label: string;
@@ -83,12 +83,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark-mode', darkMode);
     localStorage.setItem('darkMode', String(darkMode));
     window.dispatchEvent(new Event('darkModeChanged'));
   }, [darkMode]);
 
-  // Ctrl/Cmd+K shortcut for global search
+  useEffect(() => {
+    const handler = () => setDarkMode(localStorage.getItem('darkMode') === 'true');
+    window.addEventListener('storage', handler);
+    window.addEventListener('darkModeChanged', handler);
+    return () => {
+      window.removeEventListener('storage', handler);
+      window.removeEventListener('darkModeChanged', handler);
+    };
+  }, []);
+
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
@@ -110,16 +118,31 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const drawerContent = (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <Box sx={{ p: 2, bgcolor: 'primary.main', color: 'white', minHeight: 56, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-        <Typography variant="subtitle1" fontWeight={700} noWrap sx={{ lineHeight: 1.2 }}>
-          Lakhia And Co.
-        </Typography>
-        <Typography variant="caption" sx={{ opacity: 0.75, fontSize: '0.7rem' }}>
-          Office ERP
-        </Typography>
+      <Box sx={{
+        px: 2.5, py: 2, display: 'flex', alignItems: 'center', gap: 1.5,
+        minHeight: 64,
+        borderBottom: (t) => `1px solid ${t.palette.mode === 'dark' ? 'rgba(148,163,184,0.1)' : 'rgba(15,23,42,0.06)'}`,
+      }}>
+        <Box sx={{
+          width: 36, height: 36, borderRadius: 2,
+          bgcolor: 'primary.main',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0,
+          fontSize: '1.1rem', fontWeight: 800, color: 'primary.contrastText',
+        }}>
+          L
+        </Box>
+        <Box sx={{ overflow: 'hidden' }}>
+          <Typography variant="subtitle2" fontWeight={800} noWrap sx={{ lineHeight: 1.2, fontSize: '0.95rem' }}>
+            Lakhia & Co.
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', lineHeight: 1.2 }}>
+            Office ERP
+          </Typography>
+        </Box>
       </Box>
-      <Divider />
-      <List sx={{ flex: 1, pt: 0.5, overflow: 'auto' }}>
+
+      <List sx={{ flex: 1, pt: 1, pb: 1, overflow: 'auto' }}>
         {visibleItems.map((item) => {
           if (item.children) {
             const isExpanded = expanded === item.label;
@@ -130,13 +153,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   <ListItemButton
                     selected={isActive}
                     onClick={() => setExpanded(isExpanded ? null : item.label)}
-                    sx={{ py: 0.8, pl: 2 }}
+                    sx={{ py: 1, pl: 2 }}
                   >
-                    <ListItemIcon sx={{ minWidth: 36, color: isActive ? 'primary.main' : 'inherit' }}>
-                      {item.icon}
-                    </ListItemIcon>
-                    <ListItemText primary={item.label} primaryTypographyProps={{ fontSize: '0.875rem' }} />
-                    {isExpanded ? <ExpandLess /> : <ExpandMore />}
+                    <ListItemIcon sx={{ minWidth: 38 }}>{item.icon}</ListItemIcon>
+                    <ListItemText primary={item.label} primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 600 }} />
+                    {isExpanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
                   </ListItemButton>
                 </ListItem>
                 <Collapse in={isExpanded}>
@@ -147,7 +168,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                           component={RouterLink}
                           to={child.path}
                           selected={location.pathname === child.path}
-                          sx={{ pl: 6, py: 0.6 }}
+                          sx={{ pl: 6, py: 0.7 }}
                           onClick={() => setMobileOpen(false)}
                         >
                           <ListItemText primary={child.label} primaryTypographyProps={{ fontSize: '0.8rem' }} />
@@ -166,26 +187,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 to={item.path}
                 selected={location.pathname === item.path || location.pathname.startsWith(item.path + '/')}
                 onClick={() => setMobileOpen(false)}
-                sx={{
-                  py: 0.8, pl: 2,
-                  '&.Mui-selected': {
-                    bgcolor: 'primary.light',
-                    color: 'white',
-                    '& .MuiListItemIcon-root': { color: 'white' },
-                    '&:hover': { bgcolor: 'primary.main' },
-                  },
-                }}
+                sx={{ py: 1, pl: 2 }}
               >
-                <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
-                <ListItemText primary={item.label} primaryTypographyProps={{ fontSize: '0.875rem' }} />
+                <ListItemIcon sx={{ minWidth: 38 }}>{item.icon}</ListItemIcon>
+                <ListItemText primary={item.label} primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 600 }} />
               </ListItemButton>
             </ListItem>
           );
         })}
       </List>
+
       <Divider />
-      <Box sx={{ p: 1.5, bgcolor: 'action.hover' }}>
-        <Typography variant="caption" color="text.secondary" display="block" fontWeight={500}>
+      <Box sx={{ px: 2, py: 1.5 }}>
+        <Typography variant="caption" color="text.secondary" display="block" fontWeight={600}>
           v4.1.0 — {profile?.role?.toUpperCase()}
         </Typography>
       </Box>
@@ -196,14 +210,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
       <AppBar
         position="fixed"
-        sx={{ zIndex: (theme) => theme.zIndex.drawer + 1, bgcolor: 'primary.dark' }}
+        sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}
         elevation={0}
       >
-        <Toolbar variant="dense" sx={{ gap: 1 }}>
+        <Toolbar variant="dense">
           <IconButton color="inherit" onClick={() => setMobileOpen(!mobileOpen)} sx={{ display: { md: 'none' } }}>
             <MenuIcon />
           </IconButton>
-          <Typography variant="subtitle1" fontWeight={600} sx={{ flexGrow: 1 }}>
+          <Typography variant="subtitle1" fontWeight={700} sx={{ flexGrow: 1, fontSize: '1rem' }}>
             {visibleItems.find(n => location.pathname === n.path || location.pathname.startsWith(n.path + '/'))?.label ?? 'ERP'}
           </Typography>
           <Tooltip title="Search (Ctrl+K)">
@@ -211,7 +225,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <SearchIcon />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Toggle theme">
+          <Tooltip title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}>
             <IconButton color="inherit" onClick={() => setDarkMode(!darkMode)}>
               {darkMode ? <LightModeIcon /> : <DarkModeIcon />}
             </IconButton>
@@ -224,8 +238,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </IconButton>
           </Tooltip>
           <Tooltip title={profile?.full_name ?? 'Account'}>
-            <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} size="small">
-              <Avatar sx={{ width: 30, height: 30, bgcolor: 'secondary.main', fontSize: '0.85rem' }}>
+            <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} size="small" sx={{ ml: 0.5 }}>
+              <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main', fontSize: '0.85rem', fontWeight: 700 }}>
                 {profile?.full_name?.[0] ?? '?'}
               </Avatar>
             </IconButton>
@@ -236,7 +250,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
         <MenuItem disabled>
           <Box>
-            <Typography variant="body2" fontWeight={600}>{profile?.full_name}</Typography>
+            <Typography variant="body2" fontWeight={700}>{profile?.full_name}</Typography>
             <Typography variant="caption" color="text.secondary">{profile?.role}</Typography>
           </Box>
         </MenuItem>

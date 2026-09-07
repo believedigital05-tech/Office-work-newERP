@@ -49,8 +49,6 @@ function parseYear(ayOrFy: string | undefined | null): number | null {
   return m ? parseInt(m[1]) : null;
 }
 
-const DEFAULT_RULE_ID = 'default-10';
-
 export default function ShredderPage() {
   const { profile, user } = useAuth();
   const canEdit = profile?.role === 'admin' || profile?.role === 'manager';
@@ -60,7 +58,7 @@ export default function ShredderPage() {
   const [archivedFiles, setArchivedFiles] = useState<PhysicalFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [rules, setRules] = useState<RetentionRule[]>([]);
-  const [activeRuleId, setActiveRuleId] = useState<string>(DEFAULT_RULE_ID);
+  const [activeRuleId, setActiveRuleId] = useState<string>('');
   const [search, setSearch] = useState('');
   const [clientFilter, setClientFilter] = useState('all');
   const [cabinetFilter, setCabinetFilter] = useState('all');
@@ -92,8 +90,9 @@ export default function ShredderPage() {
     supabase.from('retention_rules').select('*').order('is_default', { ascending: false }).then(r => {
       const loaded = (r.data ?? []) as RetentionRule[];
       setRules(loaded);
-      if (loaded.length > 0 && !loaded.find(r => r.id === activeRuleId)) {
-        setActiveRuleId(loaded[0].id);
+      if (loaded.length > 0) {
+        const defaultRule = loaded.find(r => r.is_default);
+        setActiveRuleId(defaultRule?.id ?? loaded[0].id);
       }
     });
     supabase.from('cabinets').select('*').eq('is_deleted', false).order('cabinet_name').then(r => setCabinets(r.data ?? []));
@@ -274,7 +273,10 @@ export default function ShredderPage() {
   async function handleDeleteRule(rule: RetentionRule) {
     if (rule.is_default) return;
     await supabase.from('retention_rules').delete().eq('id', rule.id);
-    if (activeRuleId === rule.id) setActiveRuleId(DEFAULT_RULE_ID);
+    if (activeRuleId === rule.id) {
+      const defaultRule = rules.find(r => r.is_default);
+      setActiveRuleId(defaultRule?.id ?? '');
+    }
     const { data } = await supabase.from('retention_rules').select('*').order('is_default', { ascending: false });
     setRules((data ?? []) as RetentionRule[]);
   }
@@ -306,7 +308,7 @@ export default function ShredderPage() {
 
       <Paper sx={{ mb: 2, p: 2 }}>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} flexWrap="wrap" useFlexGap alignItems="center">
-          <TextField select value={activeRuleId} onChange={e => { setActiveRuleId(e.target.value); setPage(0); setSelected(new Set()); }} size="small" label="Retention Rule" sx={{ minWidth: 200 }}>
+          <TextField select value={activeRuleId} onChange={e => { setActiveRuleId(e.target.value); setPage(0); setSelected(new Set()); }} size="small" label="Retention Rule" sx={{ minWidth: 200 }} disabled={!activeRuleId}>
             {rules.map(r => <MenuItem key={r.id} value={r.id}>{r.name} ({r.years} years){r.is_default ? ' ★' : ''}</MenuItem>)}
           </TextField>
           <TextField

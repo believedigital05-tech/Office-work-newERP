@@ -38,7 +38,7 @@ interface Stats {
   urgentActivities: number;
 }
 
-const COLORS = ['#1a3c6e', '#c8943a', '#2e7d32', '#d32f2f', '#0288d1'];
+const COLORS = ['#2563eb', '#f59e0b', '#16a34a', '#dc2626', '#0ea5e9'];
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
@@ -138,14 +138,14 @@ export default function DashboardPage() {
   if (loading) return <Box display="flex" justifyContent="center" mt={6}><CircularProgress /></Box>;
 
   const statCards = [
-    { label: 'Total Clients', value: stats?.totalClients ?? 0, sub: `${stats?.activeClients ?? 0} active`, icon: <PeopleIcon />, color: '#1a3c6e' },
-    { label: 'Physical Files', value: stats?.totalFiles ?? 0, sub: `${stats?.filesOut ?? 0} out`, icon: <FolderIcon />, color: '#2e7d32' },
-    { label: 'Overdue Movements', value: stats?.overdueMovements ?? 0, sub: 'files not returned', icon: <WarningIcon />, color: '#d32f2f' },
-    { label: 'Pending Activities', value: stats?.pendingActivities ?? 0, sub: 'open tasks', icon: <AssignmentIcon />, color: '#c8943a' },
-    { label: "Today's Couriers", value: stats?.todaysCouriers ?? 0, sub: 'received today', icon: <LocalShippingIcon />, color: '#0288d1' },
-    { label: 'Files Out', value: stats?.filesOut ?? 0, sub: 'currently checked out', icon: <SwapHorizIcon />, color: '#7b1fa2' },
-    { label: 'Cabinets', value: stats?.totalCabinets ?? 0, sub: 'storage units', icon: <FolderIcon />, color: '#00838f' },
-    { label: 'Completed', value: stats?.completedActivities ?? 0, sub: 'activities done', icon: <AssignmentIcon />, color: '#2e7d32' },
+    { label: 'Total Clients', value: stats?.totalClients ?? 0, sub: `${stats?.activeClients ?? 0} active`, icon: <PeopleIcon />, color: '#2563eb' },
+    { label: 'Physical Files', value: stats?.totalFiles ?? 0, sub: `${stats?.filesOut ?? 0} out`, icon: <FolderIcon />, color: '#16a34a' },
+    { label: 'Overdue Movements', value: stats?.overdueMovements ?? 0, sub: 'files not returned', icon: <WarningIcon />, color: '#dc2626' },
+    { label: 'Pending Activities', value: stats?.pendingActivities ?? 0, sub: 'open tasks', icon: <AssignmentIcon />, color: '#f59e0b' },
+    { label: "Today's Couriers", value: stats?.todaysCouriers ?? 0, sub: 'received today', icon: <LocalShippingIcon />, color: '#0ea5e9' },
+    { label: 'Files Out', value: stats?.filesOut ?? 0, sub: 'currently checked out', icon: <SwapHorizIcon />, color: '#8b5cf6' },
+    { label: 'Cabinets', value: stats?.totalCabinets ?? 0, sub: 'storage units', icon: <FolderIcon />, color: '#14b8a6' },
+    { label: 'Completed', value: stats?.completedActivities ?? 0, sub: 'activities done', icon: <AssignmentIcon />, color: '#22c55e' },
   ];
 
   return (
@@ -183,8 +183,8 @@ export default function DashboardPage() {
                 <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
                 <RechartsTooltip />
-                <Bar dataKey="clients" name="Clients" fill="#1a3c6e" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="activities" name="Activities" fill="#c8943a" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="clients" name="Clients" fill="#2563eb" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="activities" name="Activities" fill="#f59e0b" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </Paper>
@@ -223,7 +223,7 @@ export default function DashboardPage() {
                   <XAxis type="number" tick={{ fontSize: 12 }} />
                   <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={120} />
                   <RechartsTooltip />
-                  <Bar dataKey="value" name="Clients" fill="#1a3c6e" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="value" name="Clients" fill="#2563eb" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </Paper>
