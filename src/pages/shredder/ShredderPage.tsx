@@ -102,7 +102,7 @@ export default function ShredderPage() {
   const loadFiles = useCallback(async () => {
     setLoading(true);
     const { data } = await supabase.from('physical_files')
-      .select('*, client:clients(client_name,client_id), cabinet:cabinets(cabinet_name), current_holder:employees(full_name), archived_by_employee:employees!physical_files_archived_by_fkey(full_name)')
+      .select('*, client:clients(client_name,client_id), cabinet:cabinets(cabinet_name), current_holder:employees(full_name)')
       .eq('is_deleted', false)
       .in('status', ['available', 'in_use', 'sent_outside', 'missing', 'archived'])
       .order('created_at', { ascending: false });
@@ -112,7 +112,7 @@ export default function ShredderPage() {
 
   const loadArchivedFiles = useCallback(async () => {
     const { data } = await supabase.from('physical_files')
-      .select('*, client:clients(client_name,client_id), cabinet:cabinets(cabinet_name), archived_by_employee:employees!physical_files_archived_by_fkey(full_name)')
+      .select('*, client:clients(client_name,client_id), cabinet:cabinets(cabinet_name)')
       .eq('is_deleted', false)
       .eq('status', 'archived')
       .order('archived_at', { ascending: false });
@@ -382,7 +382,7 @@ export default function ShredderPage() {
                     <>
                       <TableCell><Typography variant="body2">{f.retention_rule_name ?? '-'}</Typography></TableCell>
                       <TableCell><Typography variant="body2">{f.archived_at ? format(new Date(f.archived_at), 'dd MMM yyyy') : '-'}</Typography></TableCell>
-                      <TableCell><Typography variant="body2">{(f as unknown as { archived_by_employee?: { full_name: string } }).archived_by_employee?.full_name ?? '-'}</Typography></TableCell>
+                      <TableCell><Typography variant="body2">{f.archived_by ?? '-'}</Typography></TableCell>
                     </>
                   ) : (
                     <TableCell><StatusChip status={f.status} /></TableCell>
@@ -533,7 +533,7 @@ export default function ShredderPage() {
           status: f.status.replace(/_/g, ' '),
           retention_rule_name: f.retention_rule_name ?? '-',
           archived_date: f.archived_at ? format(new Date(f.archived_at), 'dd MMM yyyy') : '-',
-          archived_by: (f as unknown as { archived_by_employee?: { full_name: string } }).archived_by_employee?.full_name ?? '-',
+          archived_by: f.archived_by ?? '-',
         })) as PdfRow[]}
         filtersDescription={hasActiveFilters ? 'Active filters applied' : undefined}
       />
