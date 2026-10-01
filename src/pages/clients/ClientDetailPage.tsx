@@ -182,7 +182,7 @@ export default function ClientDetailPage() {
               <TableBody>
                 {files.length === 0 ? <TableRow><TableCell colSpan={6} align="center">No files linked</TableCell></TableRow>
                   : files.map(f => (
-                    <TableRow key={f.id as string} hover sx={{ cursor: 'pointer' }} onClick={() => navigate(`/files/${f.id}`)}>
+                    <TableRow key={f.id as string} hover sx={{ cursor: 'pointer' }} onClick={() => navigate(`/files/${f.id}`, { state: { from: `/clients/${id}` } })}>
                       <TableCell><Typography variant="body2" fontWeight={600} color="primary.main">{f.file_id as string}</Typography></TableCell>
                       <TableCell><Typography variant="body2">{(f.file_number as string) || '-'}</Typography></TableCell>
                       <TableCell><Typography variant="body2" fontWeight={500}>{f.file_name as string}</Typography></TableCell>

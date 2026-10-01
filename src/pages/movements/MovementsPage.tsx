@@ -36,7 +36,7 @@ import AssignmentReturnIcon from '@mui/icons-material/AssignmentReturn';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import type { FileMovement, PhysicalFile, Employee } from '../../types';
+import type { FileMovement, PhysicalFile, Employee, Cabinet } from '../../types';
 import PageHeader from '../../components/common/PageHeader';
 import StatusChip from '../../components/common/StatusChip';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
@@ -63,11 +63,12 @@ export default function MovementsPage() {
   const [returnDialog, setReturnDialog] = useState<{ open: boolean; movement: FileMovement | null }>({ open: false, movement: null });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; movement: FileMovement | null }>({ open: false, movement: null });
   const [files, setFiles] = useState<PhysicalFile[]>([]);
+  const [cabinets, setCabinets] = useState<Cabinet[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [filesLoading, setFilesLoading] = useState(false);
-  const [form, setForm] = useState({ file_id: '', taken_by_id: '', purpose: '', taken_date: new Date().toISOString().split('T')[0], expected_return_date: '', remarks: '' });
+  const [form, setForm] = useState({ cabinet_id: '', file_id: '', taken_by_id: '', purpose: '', taken_date: new Date().toISOString().split('T')[0], expected_return_date: '', remarks: '' });
   const [returnForm, setReturnForm] = useState({ returned_by_id: '', received_by_id: '', returned_date: new Date().toISOString().split('T')[0], return_remarks: '' });
   const [viewMovement, setViewMovement] = useState<FileMovement | null>(null);
   const [pdfOpen, setPdfOpen] = useState(false);
@@ -99,13 +100,17 @@ export default function MovementsPage() {
 
   useEffect(() => { loadMovements(); }, [loadMovements]);
 
-  async function loadDialogData() {
+  async function loadDialogData(cabinetId = '') {
     setFilesLoading(true);
-    const [filesRes, empRes] = await Promise.all([
-      supabase.from('physical_files').select('id,file_name,file_id,cabinet:cabinets(cabinet_name)').eq('is_deleted', false).eq('status', 'available').order('file_name'),
+    const [filesRes, cabinetsRes, empRes] = await Promise.all([
+      cabinetId
+        ? supabase.from('physical_files').select('id,file_name,file_id,file_number,file_subject,assessment_year,financial_year,client:clients(client_name),cabinet:cabinets(cabinet_name)').eq('is_deleted', false).eq('status', 'available').eq('cabinet_id', cabinetId).order('file_name')
+        : Promise.resolve({ data: [] as unknown[] }),
+      supabase.from('cabinets').select('*').eq('is_deleted', false).eq('status', 'active').order('cabinet_name'),
       supabase.from('employees').select('*').eq('status', 'active').order('full_name'),
     ]);
     setFiles((filesRes.data ?? []) as unknown as PhysicalFile[]);
+    setCabinets((cabinetsRes.data ?? []) as Cabinet[]);
     setEmployees(empRes.data ?? []);
     setFilesLoading(false);
   }
@@ -113,10 +118,23 @@ export default function MovementsPage() {
   useEffect(() => { loadDialogData(); }, []);
 
   async function handleSave() {
+    if (!form.cabinet_id) { setError('Cabinet is required.'); return; }
     if (!form.file_id) { setError('File is required.'); return; }
     if (!form.taken_by_id) { setError('Taken by is required.'); return; }
     setSaving(true); setError('');
     try {
+      const { data: currentFile, error: availabilityError } = await supabase.from('physical_files')
+        .select('id')
+        .eq('id', form.file_id)
+        .eq('cabinet_id', form.cabinet_id)
+        .eq('is_deleted', false)
+        .eq('status', 'available')
+        .maybeSingle();
+      if (availabilityError) throw availabilityError;
+      if (!currentFile) {
+        setError('This file is no longer available in the selected cabinet. Refresh the selection and try again.');
+        return;
+      }
       const { data: rpcResult, error: rpcError } = await supabase.rpc('take_file', {
         p_file_id: form.file_id,
         p_taken_by_id: form.taken_by_id,

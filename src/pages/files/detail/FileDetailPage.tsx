@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Tabs from '@mui/material/Tabs';
@@ -30,6 +30,7 @@ import { format, isPast } from 'date-fns';
 export default function FileDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { profile } = useAuth();
   const [file, setFile] = useState<PhysicalFile | null>(null);
   const [movements, setMovements] = useState<FileMovement[]>([]);
@@ -38,6 +39,8 @@ export default function FileDetailPage() {
 
   const _canEdit = profile?.role === 'admin' || profile?.role === 'manager';
   void _canEdit;
+  const returnTo = typeof location.state?.from === 'string' ? location.state.from : '/files';
+  const goBack = () => navigate(returnTo);
 
   const loadData = useCallback(async () => {
     if (!id) return;
@@ -67,7 +70,7 @@ export default function FileDetailPage() {
   if (!file) {
     return (
       <Box>
-        <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/files')}>Back to Files</Button>
+        <Button startIcon={<ArrowBackIcon />} onClick={goBack}>Back to Files</Button>
         <Paper sx={{ p: 4, textAlign: 'center', mt: 2 }}>
           <Typography color="text.secondary">File not found.</Typography>
         </Paper>
@@ -78,11 +81,11 @@ export default function FileDetailPage() {
   return (
     <Box>
       <Breadcrumbs sx={{ mb: 1 }}>
-        <Link href="#" onClick={(e) => { e.preventDefault(); navigate('/files'); }}>Physical Files</Link>
+        <Link href="#" onClick={(e) => { e.preventDefault(); goBack(); }}>Physical Files</Link>
         <Typography color="text.primary">{file.file_name}</Typography>
       </Breadcrumbs>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-        <IconButton onClick={() => navigate('/files')} size="small"><ArrowBackIcon /></IconButton>
+        <IconButton onClick={goBack} size="small"><ArrowBackIcon /></IconButton>
         <Typography variant="h5" fontWeight={700} color="primary.main" sx={{ fontSize: { xs: '1.25rem', md: '1.5rem' } }}>
           {file.file_name}
         </Typography>

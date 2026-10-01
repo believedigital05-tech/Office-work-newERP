@@ -143,7 +143,7 @@ export default function SearchPage() {
                 <TableHead><TableRow><TableCell>File ID</TableCell><TableCell>File Name</TableCell><TableCell>Subject</TableCell><TableCell>Client</TableCell><TableCell>Status</TableCell></TableRow></TableHead>
                 <TableBody>
                   {results.files.length === 0 ? <TableRow><TableCell colSpan={5} align="center">No files found</TableCell></TableRow>
-                    : results.files.map(f => <TableRow key={f.id as string} hover onClick={() => navigate(`/files/${f.id}`)} sx={{ cursor: 'pointer' }}>
+                    : results.files.map(f => <TableRow key={f.id as string} hover onClick={() => navigate(`/files/${f.id}`, { state: { from: '/search' } })} sx={{ cursor: 'pointer' }}>
                       <TableCell><Typography variant="body2" fontWeight={600} color="primary.main">{f.file_id as string}</Typography></TableCell>
                       <TableCell>{f.file_name as string}</TableCell>
                       <TableCell><Typography variant="caption">{f.file_subject as string ?? '-'}</Typography></TableCell>
