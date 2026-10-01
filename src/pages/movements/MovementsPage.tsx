@@ -199,7 +199,7 @@ export default function MovementsPage() {
         action={!isMobile ? (
           <Stack direction="row" spacing={1}>
             <Button variant="outlined" onClick={() => setPdfOpen(true)}>Export PDF</Button>
-            {canEdit && <Button startIcon={<AddIcon />} variant="contained" onClick={() => { setForm({ file_id: '', taken_by_id: '', purpose: '', taken_date: new Date().toISOString().split('T')[0], expected_return_date: '', remarks: '' }); setError(''); loadDialogData(); setDialogOpen(true); }}>Record Movement</Button>}
+            {canEdit && <Button startIcon={<AddIcon />} variant="contained" onClick={() => { setForm({ cabinet_id: '', file_id: '', taken_by_id: '', purpose: '', taken_date: new Date().toISOString().split('T')[0], expected_return_date: '', remarks: '' }); setError(''); loadDialogData(); setDialogOpen(true); }}>Record Movement</Button>}
           </Stack>
         ) : undefined}
       />
@@ -302,7 +302,7 @@ export default function MovementsPage() {
       </Paper>
       )}
 
-      {isMobile && canEdit && <Fab color="primary" onClick={() => { setForm({ file_id: '', taken_by_id: '', purpose: '', taken_date: new Date().toISOString().split('T')[0], expected_return_date: '', remarks: '' }); setError(''); loadDialogData(); setDialogOpen(true); }} sx={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1200 }}><AddIcon /></Fab>}
+      {isMobile && canEdit && <Fab color="primary" onClick={() => { setForm({ cabinet_id: '', file_id: '', taken_by_id: '', purpose: '', taken_date: new Date().toISOString().split('T')[0], expected_return_date: '', remarks: '' }); setError(''); loadDialogData(); setDialogOpen(true); }} sx={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1200 }}><AddIcon /></Fab>}
 
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth fullScreen={isMobile}>
         <DialogTitle>Record File Movement</DialogTitle>
@@ -310,29 +310,56 @@ export default function MovementsPage() {
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
           <Grid container spacing={2}>
             <Grid size={12}>
-              {filesLoading ? (
+              <Autocomplete
+                options={cabinets}
+                getOptionLabel={cabinet => cabinet.cabinet_name}
+                value={cabinets.find(cabinet => cabinet.id === form.cabinet_id) ?? null}
+                onChange={(_, cabinet) => {
+                  const cabinetId = cabinet?.id ?? '';
+                  setForm(previous => ({ ...previous, cabinet_id: cabinetId, file_id: '' }));
+                  void loadDialogData(cabinetId);
+                }}
+                renderInput={params => <TextField {...params} label="Cabinet *" size="small" />}
+              />
+            </Grid>
+            <Grid size={12}>
+              {filesLoading && form.cabinet_id ? (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <CircularProgress size={18} />
                   <Typography variant="body2" color="text.secondary">Loading available files...</Typography>
                 </Box>
+              ) : !form.cabinet_id ? (
+                <TextField label="File *" fullWidth size="small" disabled helperText="Select a cabinet first" />
               ) : files.length === 0 ? (
-                <Alert severity="warning">
-                  No files are currently available to take out. All files are either in use or none have been added yet.
-                </Alert>
+                <Alert severity="warning">No available files are assigned to this cabinet.</Alert>
               ) : (
                 <Autocomplete
                   options={files}
-                  getOptionLabel={f => `${f.file_id} - ${f.file_name}`}
-                  value={files.find(f => f.id === form.file_id) ?? null}
-                  onChange={(_, v) => setForm(p => ({ ...p, file_id: v?.id ?? '' }))}
-                  renderInput={params => <TextField {...params} label="File *" size="small" />}
-                  renderOption={(props, f) => (
+                  disabled={!form.cabinet_id}
+                  getOptionLabel={file => `${file.file_id} - ${file.file_name}`}
+                  filterOptions={(options, state) => {
+                    const term = state.inputValue.trim().toLowerCase();
+                    if (!term) return options;
+                    return options.filter(file => [
+                      file.file_id,
+                      file.file_name,
+                      file.file_number,
+                      file.file_subject,
+                      file.assessment_year,
+                      file.financial_year,
+                      (file.client as { client_name?: string } | undefined)?.client_name,
+                    ].some(value => String(value ?? '').toLowerCase().includes(term)));
+                  }}
+                  value={files.find(file => file.id === form.file_id) ?? null}
+                  onChange={(_, file) => setForm(previous => ({ ...previous, file_id: file?.id ?? '' }))}
+                  renderInput={params => <TextField {...params} label="File *" size="small" helperText="Available files in the selected cabinet" />}
+                  renderOption={(props, file) => (
                     <Box component="li" {...props}>
                       <Box>
-                        <Typography variant="body2" fontWeight={500}>{f.file_id} - {f.file_name}</Typography>
-                        {(f.cabinet as { cabinet_name: string } | undefined)?.cabinet_name && (
-                          <Typography variant="caption" color="text.secondary">Cabinet: {(f.cabinet as { cabinet_name: string }).cabinet_name}</Typography>
-                        )}
+                        <Typography variant="body2" fontWeight={500}>{file.file_id} - {file.file_name}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {[file.file_number, file.file_subject, (file.client as { client_name?: string } | undefined)?.client_name, file.assessment_year, file.financial_year].filter(Boolean).join(' · ')}
+                        </Typography>
                       </Box>
                     </Box>
                   )}
@@ -415,7 +442,7 @@ export default function MovementsPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setViewMovement(null)}>Close</Button>
-          {viewMovement?.file && <Button variant="outlined" onClick={() => navigate(`/files/${(viewMovement.file as { id?: string }).id ?? ''}`)}>View File</Button>}
+          {viewMovement?.file && <Button variant="outlined" onClick={() => navigate(`/files/${(viewMovement.file as { id?: string }).id ?? ''}`, { state: { from: '/movements' } })}>View File</Button>}
         </DialogActions>
       </Dialog>
 

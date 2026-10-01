@@ -15,6 +15,8 @@ import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import BusinessIcon from '@mui/icons-material/Business';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
+import { logAudit } from '../../lib/audit';
 
 export default function LoginPage() {
   const { signIn } = useAuth();
@@ -32,6 +34,10 @@ export default function LoginPage() {
     setError('');
     try {
       await signIn(email, password);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await logAudit({ action: 'LOGIN', module: 'auth', notes: `Browser session: ${navigator.userAgent.slice(0, 160)}` }, user.id);
+      }
       navigate('/dashboard');
     } catch (err: unknown) {
       let msg = 'Login failed. Please check your credentials.';

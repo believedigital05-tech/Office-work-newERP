@@ -316,7 +316,7 @@ export default function CabinetDetailPage() {
                       <TableCell><Typography variant="body2">{f.last_movement_date ? format(new Date(f.last_movement_date), 'dd MMM yy') : '-'}</Typography></TableCell>
                       <TableCell align="right" onClick={(e) => e.stopPropagation()}>
                         <Tooltip title="View"><IconButton size="small" onClick={() => { setViewFileId(f.id); setViewOpen(true); }}><VisibilityIcon fontSize="small" /></IconButton></Tooltip>
-                        {canEdit && <Tooltip title="Edit"><IconButton size="small" onClick={() => navigate(`/files/${f.id}`)}><EditIcon fontSize="small" /></IconButton></Tooltip>}
+                        {canEdit && <Tooltip title="Edit"><IconButton size="small" onClick={() => navigate(`/files/${f.id}`, { state: { from: `/cabinets/${id}` } })}><EditIcon fontSize="small" /></IconButton></Tooltip>}
                       </TableCell>
                     </TableRow>
                   ))}
