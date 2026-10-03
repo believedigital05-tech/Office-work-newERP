@@ -24,6 +24,7 @@ import FolderIcon from '@mui/icons-material/Folder';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import AssignmentIcon from '@mui/icons-material/Assignment';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
 import SearchIcon from '@mui/icons-material/Search';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -65,6 +66,7 @@ const navItems: NavItem[] = [
   { label: 'File Movement', icon: <SwapHorizIcon />, path: '/movements' },
   { label: 'Courier Register', icon: <LocalShippingIcon />, path: '/couriers' },
   { label: 'Activities', icon: <AssignmentIcon />, path: '/activities' },
+  { label: 'Staff Notebook', icon: <MenuBookIcon />, path: '/notebook' },
   { label: 'Global Search', icon: <SearchIcon />, path: '/search' },
   { label: 'Reports', icon: <BarChartIcon />, path: '/reports' },
   { label: 'Import / Export', icon: <ImportExportIcon />, path: '/import-export', roles: ['admin', 'manager'] },
@@ -200,7 +202,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <Divider />
       <Box sx={{ px: 2, py: 1.5 }}>
         <Typography variant="caption" color="text.secondary" display="block" fontWeight={600}>
-          v4.2.0 — {profile?.role?.toUpperCase()}
+          v4.3.0 — {profile?.role?.toUpperCase()}
         </Typography>
       </Box>
     </Box>

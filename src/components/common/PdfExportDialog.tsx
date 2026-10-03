@@ -23,6 +23,10 @@ export interface PdfRow {
   [key: string]: string | number | null | undefined;
 }
 
+function escapeHtml(value: unknown): string {
+  return String(value ?? '-').replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character] ?? character));
+}
+
 interface PdfExportDialogProps {
   open: boolean;
   onClose: () => void;
@@ -64,20 +68,20 @@ export default function PdfExportDialog({ open, onClose, title, columns, rows, f
     } else {
       body += '<table><thead><tr>';
       body += '<th>#</th>';
-      selectedColumns.forEach(c => { body += `<th>${c.label}</th>`; });
+      selectedColumns.forEach(c => { body += `<th>${escapeHtml(c.label)}</th>`; });
       body += '</tr></thead><tbody>';
       rows.forEach((row, i) => {
         body += `<tr><td>${i + 1}</td>`;
         selectedColumns.forEach(c => {
           const val = row[c.key];
-          body += `<td>${val ?? '-'}</td>`;
+          body += `<td>${escapeHtml(val)}</td>`;
         });
         body += '</tr>';
       });
       body += '</tbody></table>';
     }
 
-    const filterNote = filtersDescription ? `<div class="filters">Filters: ${filtersDescription}</div>` : '';
+    const filterNote = filtersDescription ? `<div class="filters">Filters: ${escapeHtml(filtersDescription)}</div>` : '';
 
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>
       <style>
@@ -94,7 +98,7 @@ export default function PdfExportDialog({ open, onClose, title, columns, rows, f
         .page-num:after { content: counter(page); }
         @media print { body { margin: 8px; } table { page-break-inside: auto; } tr { page-break-inside: avoid; } }
       </style></head><body>
-      <h1>${title}</h1>
+      <h1>${escapeHtml(title)}</h1>
       <div class="meta">Generated: ${now} &middot; Lakhia And Co. Office ERP</div>
       ${filterNote}
       ${body}

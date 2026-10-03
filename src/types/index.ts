@@ -207,6 +207,40 @@ export interface AuditLog {
   created_at: string;
 }
 
+export type NotebookStatus = 'draft' | 'pending' | 'approved';
+
+export interface NotebookEntry {
+  id: string;
+  entry_date: string;
+  created_by: string;
+  work_description: string;
+  client_id?: string | null;
+  client?: Client | null;
+  physical_file_id?: string | null;
+  physical_file?: PhysicalFile | null;
+  remarks?: string | null;
+  status: NotebookStatus;
+  submitted_at?: string | null;
+  approved_by?: string | null;
+  approved_at?: string | null;
+  approved_by_profile?: Profile | null;
+  creator?: Profile | null;
+  last_edited_by?: string | null;
+  last_edited_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NotebookEntryHistory {
+  id: string;
+  entry_id: string;
+  edited_by: string;
+  edited_at: string;
+  old_values: Record<string, unknown>;
+  new_values: Record<string, unknown>;
+  editor?: Profile | null;
+}
+
 export interface Notification {
   id: string;
   user_id: string;

@@ -18,6 +18,7 @@ import CabinetDetailPage from './pages/files/CabinetDetailPage';
 import MovementsPage from './pages/movements/MovementsPage';
 import CouriersPage from './pages/couriers/CouriersPage';
 import ActivitiesPage from './pages/activities/ActivitiesPage';
+import NotebookPage from './pages/notebook/NotebookPage';
 import SearchPage from './pages/search/SearchPage';
 import ReportsPage from './pages/reports/ReportsPage';
 import RecycleBinPage from './pages/recycle/RecycleBinPage';
@@ -63,6 +64,7 @@ function AppRoutes() {
       <Route path="/movements" element={<ProtectedRoute><MovementsPage /></ProtectedRoute>} />
       <Route path="/couriers" element={<ProtectedRoute><CouriersPage /></ProtectedRoute>} />
       <Route path="/activities" element={<ProtectedRoute><ActivitiesPage /></ProtectedRoute>} />
+      <Route path="/notebook" element={<ProtectedRoute><NotebookPage /></ProtectedRoute>} />
       <Route path="/search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
       <Route path="/reports" element={<ProtectedRoute><ReportsPage /></ProtectedRoute>} />
       <Route path="/import-export" element={<ProtectedRoute><ImportExportPage /></ProtectedRoute>} />
