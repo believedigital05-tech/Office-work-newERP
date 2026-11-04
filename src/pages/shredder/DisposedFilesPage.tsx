@@ -33,7 +33,7 @@ import type { PhysicalFile } from '../../types';
 import { format } from 'date-fns';
 
 interface ArchivedFile extends PhysicalFile {
-  archived_by_employee?: { full_name: string } | null;
+  archived_by_profile?: { full_name: string } | null;
 }
 
 export default function DisposedFilesPage() {
@@ -51,7 +51,7 @@ export default function DisposedFilesPage() {
   const loadFiles = useCallback(async () => {
     setLoading(true);
     const { data } = await supabase.from('physical_files')
-      .select('*, client:clients(client_name,client_id), cabinet:cabinets(cabinet_name), archived_by_employee:employees!physical_files_archived_by_fkey(full_name)')
+      .select('*, client:clients(client_name,client_id), cabinet:cabinets(cabinet_name), archived_by_profile:profiles!physical_files_archived_by_fkey(full_name)')
       .eq('is_deleted', false)
       .eq('status', 'archived')
       .order('archived_at', { ascending: false });
@@ -152,7 +152,7 @@ export default function DisposedFilesPage() {
                   <TableCell><Typography variant="body2">{(f.cabinet as { cabinet_name: string } | undefined)?.cabinet_name ?? '-'}</Typography></TableCell>
                   <TableCell><Typography variant="body2">{f.retention_rule_name ?? '-'}</Typography></TableCell>
                   <TableCell><Typography variant="body2">{f.archived_at ? format(new Date(f.archived_at), 'dd MMM yyyy, HH:mm') : '-'}</Typography></TableCell>
-                  <TableCell><Typography variant="body2">{f.archived_by_employee?.full_name ?? '-'}</Typography></TableCell>
+                  <TableCell><Typography variant="body2">{f.archived_by_profile?.full_name ?? '-'}</Typography></TableCell>
                   <TableCell sx={{ maxWidth: 200 }}><Typography variant="caption" noWrap title={f.archive_reason ?? ''}>{f.archive_reason ?? '-'}</Typography></TableCell>
                   <TableCell align="right" onClick={(e) => e.stopPropagation()}>
                     <Tooltip title="View"><IconButton size="small" onClick={() => { setViewFileId(f.id); setViewOpen(true); }}><VisibilityIcon fontSize="small" /></IconButton></Tooltip>

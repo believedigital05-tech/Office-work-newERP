@@ -49,7 +49,7 @@ export default function CabinetsPage() {
     const { data } = await supabase.from('cabinets').select('*').eq('is_deleted', false).order('cabinet_name');
     const cabList = (data as Cabinet[]) ?? [];
     const withCounts = await Promise.all(cabList.map(async c => {
-      const { count } = await supabase.from('physical_files').select('*', { count: 'exact', head: true }).eq('cabinet_id', c.id).eq('is_deleted', false);
+      const { count } = await supabase.from('physical_files').select('*', { count: 'exact', head: true }).eq('cabinet_id', c.id).eq('is_deleted', false).neq('status', 'archived');
       return { ...c, file_count: count ?? 0 };
     }));
     setCabinets(withCounts);
