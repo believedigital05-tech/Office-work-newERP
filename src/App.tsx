@@ -6,7 +6,10 @@ import Box from '@mui/material/Box';
 import { useState, useEffect } from 'react';
 import { createAppTheme } from './theme';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { YearProvider } from './contexts/YearContext';
+import { MinimizeProvider } from './contexts/MinimizeContext';
 import AppLayout from './components/layout/AppLayout';
+import Taskbar from './components/layout/Taskbar';
 import LoginPage from './pages/auth/LoginPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
 import ClientsPage from './pages/clients/ClientsPage';
@@ -38,7 +41,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
   if (!user) return <Navigate to="/login" replace />;
-  return <AppLayout>{children}</AppLayout>;
+  return <AppLayout><MinimizeProvider>{children}<Taskbar /></MinimizeProvider></AppLayout>;
 }
 
 function AppRoutes() {
@@ -99,7 +102,9 @@ export default function App() {
       <CssBaseline />
       <BrowserRouter>
         <AuthProvider>
-          <AppRoutes />
+          <YearProvider>
+            <AppRoutes />
+          </YearProvider>
         </AuthProvider>
       </BrowserRouter>
     </ThemeProvider>

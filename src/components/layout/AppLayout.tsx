@@ -35,11 +35,14 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import ImportExportIcon from '@mui/icons-material/ImportExport';
 import HistoryIcon from '@mui/icons-material/History';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import { useAuth } from '../../contexts/AuthContext';
+import { useYear } from '../../contexts/YearContext';
 
 const DRAWER_WIDTH = 256;
 
@@ -77,10 +80,13 @@ const navItems: NavItem[] = [
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { profile, signOut } = useAuth();
+  const { selectedAY, selectedFY, assessmentYears, financialYears, setSelectedAY, setSelectedFY, autoAY, autoFY, isManualAY, isManualFY, resetToAuto, loading: yearLoading } = useYear();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [ayAnchor, setAyAnchor] = useState<null | HTMLElement>(null);
+  const [fyAnchor, setFyAnchor] = useState<null | HTMLElement>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
 
@@ -222,6 +228,71 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <Typography variant="subtitle1" fontWeight={700} sx={{ flexGrow: 1, fontSize: '1rem' }}>
             {visibleItems.find(n => location.pathname === n.path || location.pathname.startsWith(n.path + '/'))?.label ?? 'ERP'}
           </Typography>
+
+          <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 0.75, mr: 1 }}>
+            <Tooltip title={isManualAY ? `Auto: ${autoAY}` : 'Auto-detected'}>
+              <Box
+                onClick={(e) => setAyAnchor(e.currentTarget)}
+                sx={{
+                  display: 'flex', alignItems: 'center', gap: 0.5,
+                  px: 1, py: 0.5, borderRadius: 1.5, cursor: 'pointer',
+                  border: 1, borderColor: 'divider',
+                  transition: 'all 0.2s',
+                  '&:hover': { borderColor: 'primary.main', bgcolor: 'action.hover' },
+                }}
+              >
+                <Typography variant="caption" color="text.secondary" fontWeight={700}>AY</Typography>
+                <Typography variant="caption" fontWeight={700} color={isManualAY ? 'secondary.main' : 'primary.main'}>
+                  {yearLoading ? '...' : selectedAY}
+                </Typography>
+                <ExpandMoreIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+              </Box>
+            </Tooltip>
+            <Menu anchorEl={ayAnchor} open={Boolean(ayAnchor)} onClose={() => setAyAnchor(null)} PaperProps={{ sx: { maxHeight: 300, minWidth: 160 } }}>
+              <MenuItem value="auto" onClick={() => { setSelectedAY(autoAY); setAyAnchor(null); }} sx={{ fontSize: '0.8rem' }}>
+                <Box><Typography variant="inherit" fontWeight={600}>Auto ({autoAY})</Typography></Box>
+              </MenuItem>
+              <Divider sx={{ my: 0.5 }} />
+              {assessmentYears.map(y => (
+                <MenuItem key={y.id} value={y.label} onClick={() => { setSelectedAY(y.label); setAyAnchor(null); }}
+                  selected={y.label === selectedAY} sx={{ fontSize: '0.8rem', py: 0.5 }}>{y.label}</MenuItem>
+              ))}
+            </Menu>
+
+            <Tooltip title={isManualFY ? `Auto: ${autoFY}` : 'Auto-detected'}>
+              <Box
+                onClick={(e) => setFyAnchor(e.currentTarget)}
+                sx={{
+                  display: 'flex', alignItems: 'center', gap: 0.5,
+                  px: 1, py: 0.5, borderRadius: 1.5, cursor: 'pointer',
+                  border: 1, borderColor: 'divider',
+                  transition: 'all 0.2s',
+                  '&:hover': { borderColor: 'primary.main', bgcolor: 'action.hover' },
+                }}
+              >
+                <Typography variant="caption" color="text.secondary" fontWeight={700}>FY</Typography>
+                <Typography variant="caption" fontWeight={700} color={isManualFY ? 'secondary.main' : 'primary.main'}>
+                  {yearLoading ? '...' : selectedFY}
+                </Typography>
+                <ExpandMoreIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+              </Box>
+            </Tooltip>
+            <Menu anchorEl={fyAnchor} open={Boolean(fyAnchor)} onClose={() => setFyAnchor(null)} PaperProps={{ sx: { maxHeight: 300, minWidth: 160 } }}>
+              <MenuItem value="auto" onClick={() => { setSelectedFY(autoFY); setFyAnchor(null); }} sx={{ fontSize: '0.8rem' }}>
+                <Box><Typography variant="inherit" fontWeight={600}>Auto ({autoFY})</Typography></Box>
+              </MenuItem>
+              <Divider sx={{ my: 0.5 }} />
+              {financialYears.map(y => (
+                <MenuItem key={y.id} value={y.label} onClick={() => { setSelectedFY(y.label); setFyAnchor(null); }}
+                  selected={y.label === selectedFY} sx={{ fontSize: '0.8rem', py: 0.5 }}>{y.label}</MenuItem>
+              ))}
+            </Menu>
+            {(isManualAY || isManualFY) && (
+              <Tooltip title="Reset to auto">
+                <IconButton size="small" onClick={resetToAuto} sx={{ p: 0.25 }}><RefreshIcon sx={{ fontSize: 16 }} /></IconButton>
+              </Tooltip>
+            )}
+          </Box>
           <Tooltip title="Search (Ctrl+K)">
             <IconButton color="inherit" onClick={() => navigate('/search')}>
               <SearchIcon />

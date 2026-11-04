@@ -127,10 +127,15 @@ export function createAppTheme(mode: 'light' | 'dark') {
       MuiButton: {
         defaultProps: { disableElevation: true },
         styleOverrides: {
-          root: { textTransform: 'none', fontWeight: 600, borderRadius: 10, padding: '8px 18px' },
+          root: {
+            textTransform: 'none', fontWeight: 600, borderRadius: 10, padding: '8px 18px',
+            transition: 'all 0.2s ease',
+            '&:active': { transform: 'scale(0.97)' },
+          },
           sizeSmall: { padding: '5px 12px', fontSize: '0.8125rem' },
           sizeLarge: { padding: '11px 24px' },
-          contained: { boxShadow: 'none', '&:hover': { boxShadow: 'none' } },
+          contained: { boxShadow: 'none', '&:hover': { boxShadow: 'none', transform: 'translateY(-1px)' } },
+          outlined: { '&:hover': { transform: 'translateY(-1px)' } },
         },
       },
       MuiChip: {
@@ -146,12 +151,13 @@ export function createAppTheme(mode: 'light' | 'dark') {
             borderRadius: 16,
             border: `1px solid ${isDark ? 'rgba(148,163,184,0.12)' : 'rgba(15,23,42,0.06)'}`,
             backgroundImage: 'none',
+            transition: 'box-shadow 0.25s ease, border-color 0.25s ease, transform 0.25s ease',
           },
         },
       },
       MuiPaper: {
         styleOverrides: {
-          root: { backgroundImage: 'none', borderRadius: 12 },
+          root: { backgroundImage: 'none', borderRadius: 12, transition: 'box-shadow 0.2s ease' },
           rounded: { borderRadius: 12 },
         },
       },
@@ -195,6 +201,7 @@ export function createAppTheme(mode: 'light' | 'dark') {
       MuiTableRow: {
         styleOverrides: {
           root: {
+            transition: 'background-color 0.15s ease',
             '&:last-child .MuiTableCell-root': { borderBottom: 0 },
           },
         },
@@ -245,7 +252,10 @@ export function createAppTheme(mode: 'light' | 'dark') {
       },
       MuiDialog: {
         styleOverrides: {
-          paper: { borderRadius: 16 },
+          paper: {
+            borderRadius: 16,
+            animation: 'scaleIn 0.2s ease-out',
+          },
         },
       },
       MuiTabs: {
@@ -266,6 +276,9 @@ export function createAppTheme(mode: 'light' | 'dark') {
             fontWeight: 600,
             fontSize: '0.875rem',
             minHeight: 40,
+            transition: 'color 0.2s ease',
+            opacity: 0.7,
+            '&.Mui-selected': { opacity: 1 },
           },
         },
       },
@@ -284,6 +297,22 @@ export function createAppTheme(mode: 'light' | 'dark') {
               backgroundColor: isDark ? 'rgba(148,163,184,0.2)' : 'rgba(15,23,42,0.12)',
               borderRadius: 4,
             },
+          },
+          '@keyframes fadeInUp': {
+            from: { opacity: 0, transform: 'translateY(8px)' },
+            to: { opacity: 1, transform: 'translateY(0)' },
+          },
+          '@keyframes fadeIn': {
+            from: { opacity: 0 },
+            to: { opacity: 1 },
+          },
+          '@keyframes slideInRight': {
+            from: { opacity: 0, transform: 'translateX(20px)' },
+            to: { opacity: 1, transform: 'translateX(0)' },
+          },
+          '@keyframes scaleIn': {
+            from: { opacity: 0, transform: 'scale(0.95)' },
+            to: { opacity: 1, transform: 'scale(1)' },
           },
         },
       },

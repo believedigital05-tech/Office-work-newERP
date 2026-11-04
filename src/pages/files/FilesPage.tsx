@@ -48,6 +48,7 @@ import PageHeader from '../../components/common/PageHeader';
 import StatusChip from '../../components/common/StatusChip';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { useAuth } from '../../contexts/AuthContext';
+import { useYear } from '../../contexts/YearContext';
 import { logAudit } from '../../lib/audit';
 import { format } from 'date-fns';
 import FileViewDialog from '../../components/files/FileViewDialog';
@@ -64,6 +65,7 @@ const defaultForm = {
 
 export default function FilesPage() {
   const { profile, user } = useAuth();
+  const { selectedAY, selectedFY, assessmentYears, financialYears } = useYear();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [files, setFiles] = useState<PhysicalFile[]>([]);
@@ -73,8 +75,8 @@ export default function FilesPage() {
   const [subjectSearch, setSubjectSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [clientFilter, setClientFilter] = useState('all');
-  const [ayFilter, setAyFilter] = useState('');
-  const [fyFilter, setFyFilter] = useState('');
+  const [ayFilter, setAyFilter] = useState('all');
+  const [fyFilter, setFyFilter] = useState('all');
   const [cabinetFilter, setCabinetFilter] = useState('all');
   const [holderFilter, setHolderFilter] = useState('all');
   const [page, setPage] = useState(0);
@@ -107,8 +109,8 @@ export default function FilesPage() {
       .range(page * rowsPerPage, (page + 1) * rowsPerPage - 1);
     if (statusFilter !== 'all') query = query.eq('status', statusFilter);
     if (clientFilter !== 'all') query = query.eq('client_id', clientFilter);
-    if (ayFilter) query = query.ilike('assessment_year', `%${ayFilter}%`);
-    if (fyFilter) query = query.ilike('financial_year', `%${fyFilter}%`);
+    if (ayFilter !== 'all') query = query.eq('assessment_year', ayFilter);
+    if (fyFilter !== 'all') query = query.eq('financial_year', fyFilter);
     if (cabinetFilter !== 'all') query = query.eq('cabinet_id', cabinetFilter);
     if (holderFilter !== 'all') query = query.eq('current_holder_id', holderFilter);
     if (search) query = query.or(`file_name.ilike.%${search}%,file_id.ilike.%${search}%,file_number.ilike.%${search}%`);
@@ -191,14 +193,14 @@ export default function FilesPage() {
     setSubjectSearch('');
     setStatusFilter('all');
     setClientFilter('all');
-    setAyFilter('');
-    setFyFilter('');
+    setAyFilter('all');
+    setFyFilter('all');
     setCabinetFilter('all');
     setHolderFilter('all');
     setPage(0);
   }
 
-  const hasActiveFilters = search || subjectSearch || statusFilter !== 'all' || clientFilter !== 'all' || ayFilter || fyFilter || cabinetFilter !== 'all' || holderFilter !== 'all';
+  const hasActiveFilters = search || subjectSearch || statusFilter !== 'all' || clientFilter !== 'all' || ayFilter !== 'all' || fyFilter !== 'all' || cabinetFilter !== 'all' || holderFilter !== 'all';
 
   function buildPrintHtml(title: string, sections: { heading: string; rows: PhysicalFile[] }[]): string {
     const today = format(new Date(), 'dd MMM yyyy');
@@ -254,8 +256,8 @@ export default function FilesPage() {
         let filtered = allFiles;
         if (statusFilter !== 'all') filtered = filtered.filter(f => f.status === statusFilter);
         if (clientFilter !== 'all') filtered = filtered.filter(f => f.client_id === clientFilter);
-        if (ayFilter) { const s = ayFilter.toLowerCase(); filtered = filtered.filter(f => (f.assessment_year ?? '').toLowerCase().includes(s)); }
-        if (fyFilter) { const s = fyFilter.toLowerCase(); filtered = filtered.filter(f => (f.financial_year ?? '').toLowerCase().includes(s)); }
+        if (ayFilter !== 'all') filtered = filtered.filter(f => f.assessment_year === ayFilter);
+        if (fyFilter !== 'all') filtered = filtered.filter(f => f.financial_year === fyFilter);
         if (cabinetFilter !== 'all') filtered = filtered.filter(f => f.cabinet_id === cabinetFilter);
         if (holderFilter !== 'all') filtered = filtered.filter(f => f.current_holder_id === holderFilter);
         if (search) {
@@ -273,8 +275,8 @@ export default function FilesPage() {
         if (search) filterDesc.push(`Name/No: "${search}"`);
         if (subjectSearch) filterDesc.push(`Subject: "${subjectSearch}"`);
         if (clientFilter !== 'all') filterDesc.push(`Client: ${clients.find(c => c.id === clientFilter)?.client_name ?? ''}`);
-        if (ayFilter) filterDesc.push(`AY: ${ayFilter}`);
-        if (fyFilter) filterDesc.push(`FY: ${fyFilter}`);
+        if (ayFilter !== 'all') filterDesc.push(`AY: ${ayFilter}`);
+        if (fyFilter !== 'all') filterDesc.push(`FY: ${fyFilter}`);
         if (statusFilter !== 'all') filterDesc.push(`Status: ${statusFilter}`);
         if (cabinetFilter !== 'all') filterDesc.push(`Cabinet: ${cabinets.find(c => c.id === cabinetFilter)?.cabinet_name ?? ''}`);
         if (holderFilter !== 'all') filterDesc.push(`Holder: ${employees.find(e => e.id === holderFilter)?.full_name ?? ''}`);
@@ -359,8 +361,14 @@ export default function FilesPage() {
               <MenuItem value="all">All Clients</MenuItem>
               {clients.map(c => <MenuItem key={c.id} value={c.id}>{c.client_name}</MenuItem>)}
             </TextField>
-            <TextField placeholder="Filter AY..." value={ayFilter} onChange={e => { setAyFilter(e.target.value); setPage(0); }} size="small" label="AY" sx={{ minWidth: 110 }} />
-            <TextField placeholder="Filter FY..." value={fyFilter} onChange={e => { setFyFilter(e.target.value); setPage(0); }} size="small" label="FY" sx={{ minWidth: 110 }} />
+            <TextField select value={ayFilter} onChange={e => { setAyFilter(e.target.value); setPage(0); }} size="small" label="AY" sx={{ minWidth: 120 }}>
+              <MenuItem value="all">All AY</MenuItem>
+              {assessmentYears.map(y => <MenuItem key={y.id} value={y.label}>{y.label}</MenuItem>)}
+            </TextField>
+            <TextField select value={fyFilter} onChange={e => { setFyFilter(e.target.value); setPage(0); }} size="small" label="FY" sx={{ minWidth: 120 }}>
+              <MenuItem value="all">All FY</MenuItem>
+              {financialYears.map(y => <MenuItem key={y.id} value={y.label}>{y.label}</MenuItem>)}
+            </TextField>
             <TextField select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(0); }} size="small" label="Status" sx={{ minWidth: 130 }}>
               {STATUS_OPTIONS.map(s => <MenuItem key={s} value={s}>{s === 'all' ? 'All Status' : s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</MenuItem>)}
             </TextField>
@@ -495,14 +503,16 @@ export default function FilesPage() {
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField label="AY (e.g. 2025-26)" value={form.assessment_year} onChange={e => setForm(p => ({ ...p, assessment_year: e.target.value }))} fullWidth size="small" placeholder="2025-26"
-                error={!!form.assessment_year && !/^\d{4}-\d{2}$/.test(form.assessment_year)}
-                helperText={!!form.assessment_year && !/^\d{4}-\d{2}$/.test(form.assessment_year) ? 'Enter AY in format 2025-26' : ''} />
+              <TextField select label="Assessment Year" value={form.assessment_year} onChange={e => setForm(p => ({ ...p, assessment_year: e.target.value }))} fullWidth size="small">
+                <MenuItem value="">-- None --</MenuItem>
+                {assessmentYears.map(y => <MenuItem key={y.id} value={y.label}>{y.label}</MenuItem>)}
+              </TextField>
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField label="FY (e.g. 2025-26)" value={form.financial_year} onChange={e => setForm(p => ({ ...p, financial_year: e.target.value }))} fullWidth size="small" placeholder="2025-26"
-                error={!!form.financial_year && !/^\d{4}-\d{2}$/.test(form.financial_year)}
-                helperText={!!form.financial_year && !/^\d{4}-\d{2}$/.test(form.financial_year) ? 'Enter FY in format 2025-26' : ''} />
+              <TextField select label="Financial Year" value={form.financial_year} onChange={e => setForm(p => ({ ...p, financial_year: e.target.value }))} fullWidth size="small">
+                <MenuItem value="">-- None --</MenuItem>
+                {financialYears.map(y => <MenuItem key={y.id} value={y.label}>{y.label}</MenuItem>)}
+              </TextField>
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField select label="Status" value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value }))} fullWidth size="small">
