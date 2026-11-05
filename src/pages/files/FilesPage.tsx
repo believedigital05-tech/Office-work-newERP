@@ -141,7 +141,7 @@ export default function FilesPage() {
         assessment_year: file.assessment_year ?? '', financial_year: file.financial_year ?? '',
       });
     } else {
-      setForm(defaultForm);
+      setForm({ ...defaultForm, assessment_year: selectedAY, financial_year: selectedFY });
     }
     setError('');
     setDialogOpen(true);

@@ -35,6 +35,14 @@ import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import ViewListIcon from '@mui/icons-material/ViewList';
+import ViewModuleIcon from '@mui/icons-material/ViewModule';
+import ViewAgendaIcon from '@mui/icons-material/ViewAgenda';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import PersonIcon from '@mui/icons-material/Person';
+import BusinessIcon from '@mui/icons-material/Business';
 import { supabase } from '../../lib/supabase';
 import type { Activity, Client, Employee, ActivityType } from '../../types';
 import PageHeader from '../../components/common/PageHeader';
@@ -46,6 +54,7 @@ import { format, isPast } from 'date-fns';
 
 const STATUS_OPTS = ['all', 'not_started', 'in_progress', 'completed', 'on_hold', 'cancelled'];
 const PRIORITY_OPTS = ['low', 'medium', 'high', 'urgent'];
+type ViewMode = 'table' | 'list' | 'detailed';
 
 export default function ActivitiesPage() {
   const { profile, user } = useAuth();
@@ -67,10 +76,15 @@ export default function ActivitiesPage() {
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [viewMode, setViewMode] = useState<ViewMode>(() => (localStorage.getItem('activitiesViewMode') as ViewMode) || 'table');
   const defaultForm = { title: '', activity_type_id: '', client_id: '', assigned_employee_id: '', priority: 'medium', status: 'not_started', start_date: '', due_date: '', completion_date: '', notes: '', reminder_date: '' };
   const [form, setForm] = useState(defaultForm);
 
   const canEdit = profile?.role === 'admin' || profile?.role === 'manager' || profile?.role === 'staff';
+
+  useEffect(() => {
+    localStorage.setItem('activitiesViewMode', viewMode);
+  }, [viewMode]);
 
   const loadActivities = useCallback(async () => {
     setLoading(true);
@@ -148,11 +162,24 @@ export default function ActivitiesPage() {
       />
 
       <Paper sx={{ mb: 2, p: 2 }}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ sm: 'center' }}>
           <TextField placeholder="Search title, ID..." value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} size="small" fullWidth InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }} />
           <TextField select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(0); }} size="small" label="Status" sx={{ minWidth: 130 }}>
             {STATUS_OPTS.map(s => <MenuItem key={s} value={s}>{s === 'all' ? 'All' : s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</MenuItem>)}
           </TextField>
+          {!isMobile && (
+            <ToggleButtonGroup
+              value={viewMode}
+              exclusive
+              onChange={(_, v: ViewMode | null) => v && setViewMode(v)}
+              size="small"
+              sx={{ flexShrink: 0 }}
+            >
+              <ToggleButton value="table" title="Table View"><ViewListIcon sx={{ fontSize: 18 }} /></ToggleButton>
+              <ToggleButton value="list" title="List View"><ViewModuleIcon sx={{ fontSize: 18 }} /></ToggleButton>
+              <ToggleButton value="detailed" title="Detailed View"><ViewAgendaIcon sx={{ fontSize: 18 }} /></ToggleButton>
+            </ToggleButtonGroup>
+          )}
         </Stack>
       </Paper>
 
@@ -195,6 +222,107 @@ export default function ActivitiesPage() {
               <Button disabled={(page + 1) * rowsPerPage >= total} onClick={() => setPage(p => p + 1)} size="small">Next</Button>
             </Box>
           )}
+        </Box>
+      ) : viewMode === 'detailed' ? (
+        <Box>
+          {loading ? <Box display="flex" justifyContent="center" py={4}><CircularProgress /></Box>
+            : activities.length === 0 ? <Paper sx={{ p: 4, textAlign: 'center' }}><Typography color="text.secondary">No activities found</Typography></Paper>
+            : <Grid container spacing={2}>
+                {activities.map(a => {
+                  const isOverdue = a.due_date && isPast(new Date(a.due_date)) && a.status !== 'completed' && a.status !== 'cancelled';
+                  return (
+                    <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={a.id}>
+                      <Card sx={{
+                        height: '100%', display: 'flex', flexDirection: 'column',
+                        borderLeft: isOverdue ? 3 : 0, borderLeftColor: 'error.main',
+                        transition: 'all 0.25s ease',
+                        '&:hover': { boxShadow: 4, transform: 'translateY(-2px)' },
+                        animation: 'fadeInUp 0.3s ease-out',
+                      }}>
+                        <CardContent sx={{ flex: 1, pb: 1 }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                            <Typography variant="caption" color="primary.main" fontWeight={700}>{a.activity_id}</Typography>
+                            <StatusChip status={a.priority} />
+                          </Box>
+                          <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 0.5 }}>{a.title}</Typography>
+                          {a.notes && <Typography variant="body2" color="text.secondary" sx={{ mb: 1, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{a.notes}</Typography>}
+                          <Stack spacing={0.5} sx={{ mt: 1 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <BusinessIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                              <Typography variant="caption" color="text.secondary">{(a.client as { client_name: string } | undefined)?.client_name ?? 'No client'}</Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <PersonIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                              <Typography variant="caption" color="text.secondary">{(a.assigned_employee as { full_name: string } | undefined)?.full_name ?? 'Unassigned'}</Typography>
+                            </Box>
+                            {a.due_date && (
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <ScheduleIcon sx={{ fontSize: 14, color: isOverdue ? 'error.main' : 'text.secondary' }} />
+                                <Typography variant="caption" color={isOverdue ? 'error.main' : 'text.secondary'} fontWeight={isOverdue ? 700 : 400}>
+                                  Due {format(new Date(a.due_date), 'dd MMM yyyy')}
+                                </Typography>
+                              </Box>
+                            )}
+                          </Stack>
+                          <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
+                            <StatusChip status={a.status} />
+                            {(a.activity_type as { name: string } | undefined)?.name && <Chip label={(a.activity_type as { name: string }).name} size="small" variant="outlined" />}
+                          </Box>
+                        </CardContent>
+                        {canEdit && (
+                          <CardActions sx={{ pt: 0, px: 2, pb: 1.5 }}>
+                            {a.status !== 'completed' && a.status !== 'cancelled' && <Button size="small" color="success" startIcon={<CheckCircleIcon />} onClick={() => markComplete(a)}>Complete</Button>}
+                            <Box sx={{ flex: 1 }} />
+                            <IconButton size="small" onClick={() => openEdit(a)}><EditIcon fontSize="small" /></IconButton>
+                            {profile?.role === 'admin' && <IconButton size="small" color="error" onClick={() => setDeleteDialog({ open: true, activity: a })}><DeleteIcon fontSize="small" /></IconButton>}
+                          </CardActions>
+                        )}
+                      </Card>
+                    </Grid>
+                  );
+                })}
+              </Grid>}
+          <TablePagination component="div" count={total} page={page} onPageChange={(_, p) => setPage(p)} rowsPerPage={rowsPerPage} onRowsPerPageChange={e => { setRowsPerPage(Number(e.target.value)); setPage(0); }} rowsPerPageOptions={[10, 25, 50, 100]} />
+        </Box>
+      ) : viewMode === 'list' ? (
+        <Box>
+          {loading ? <Box display="flex" justifyContent="center" py={4}><CircularProgress /></Box>
+            : activities.length === 0 ? <Paper sx={{ p: 4, textAlign: 'center' }}><Typography color="text.secondary">No activities found</Typography></Paper>
+            : activities.map(a => {
+              const isOverdue = a.due_date && isPast(new Date(a.due_date)) && a.status !== 'completed' && a.status !== 'cancelled';
+              return (
+                <Card key={a.id} sx={{
+                  mb: 1, cursor: 'pointer',
+                  borderLeft: isOverdue ? 3 : 0, borderLeftColor: 'error.main',
+                  transition: 'all 0.2s ease',
+                  '&:hover': { boxShadow: 3, transform: 'translateX(2px)' },
+                  animation: 'fadeInUp 0.2s ease-out',
+                }} onClick={() => openEdit(a)}>
+                  <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Typography variant="caption" color="primary.main" fontWeight={700} sx={{ minWidth: 70 }}>{a.activity_id}</Typography>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="body2" fontWeight={600} noWrap>{a.title}</Typography>
+                        <Typography variant="caption" color="text.secondary" noWrap>
+                          {(a.client as { client_name: string } | undefined)?.client_name ?? 'No client'}
+                          {a.due_date && ` · Due ${format(new Date(a.due_date), 'dd MMM')}`}
+                        </Typography>
+                      </Box>
+                      <StatusChip status={a.status} />
+                      <StatusChip status={a.priority} />
+                      {canEdit && (
+                        <Box onClick={(e) => e.stopPropagation()} sx={{ display: 'flex', gap: 0.5 }}>
+                          {a.status !== 'completed' && a.status !== 'cancelled' && <IconButton size="small" color="success" onClick={() => markComplete(a)}><CheckCircleIcon sx={{ fontSize: 16 }} /></IconButton>}
+                          <IconButton size="small" onClick={() => openEdit(a)}><EditIcon sx={{ fontSize: 16 }} /></IconButton>
+                          {profile?.role === 'admin' && <IconButton size="small" color="error" onClick={() => setDeleteDialog({ open: true, activity: a })}><DeleteIcon sx={{ fontSize: 16 }} /></IconButton>}
+                        </Box>
+                      )}
+                    </Box>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          <TablePagination component="div" count={total} page={page} onPageChange={(_, p) => setPage(p)} rowsPerPage={rowsPerPage} onRowsPerPageChange={e => { setRowsPerPage(Number(e.target.value)); setPage(0); }} rowsPerPageOptions={[10, 25, 50, 100]} />
         </Box>
       ) : (
         <Paper>
