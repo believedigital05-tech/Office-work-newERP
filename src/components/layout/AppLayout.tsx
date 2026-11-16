@@ -249,7 +249,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </Box>
             </Tooltip>
             <Menu anchorEl={ayAnchor} open={Boolean(ayAnchor)} onClose={() => setAyAnchor(null)} PaperProps={{ sx: { maxHeight: 300, minWidth: 160 } }}>
-              <MenuItem value="auto" onClick={() => { setSelectedAY(autoAY); setAyAnchor(null); }} sx={{ fontSize: '0.8rem' }}>
+              <MenuItem value="auto" onClick={() => { setSelectedAY(null); setAyAnchor(null); }} sx={{ fontSize: '0.8rem' }}>
                 <Box><Typography variant="inherit" fontWeight={600}>Auto ({autoAY})</Typography></Box>
               </MenuItem>
               <Divider sx={{ my: 0.5 }} />
@@ -278,7 +278,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </Box>
             </Tooltip>
             <Menu anchorEl={fyAnchor} open={Boolean(fyAnchor)} onClose={() => setFyAnchor(null)} PaperProps={{ sx: { maxHeight: 300, minWidth: 160 } }}>
-              <MenuItem value="auto" onClick={() => { setSelectedFY(autoFY); setFyAnchor(null); }} sx={{ fontSize: '0.8rem' }}>
+              <MenuItem value="auto" onClick={() => { setSelectedFY(null); setFyAnchor(null); }} sx={{ fontSize: '0.8rem' }}>
                 <Box><Typography variant="inherit" fontWeight={600}>Auto ({autoFY})</Typography></Box>
               </MenuItem>
               <Divider sx={{ my: 0.5 }} />

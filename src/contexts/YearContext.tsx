@@ -7,8 +7,8 @@ interface YearContextValue {
   financialYears: FinancialYear[];
   selectedAY: string;
   selectedFY: string;
-  setSelectedAY: (val: string) => void;
-  setSelectedFY: (val: string) => void;
+  setSelectedAY: (val: string | null) => void;
+  setSelectedFY: (val: string | null) => void;
   autoAY: string;
   autoFY: string;
   isManualAY: boolean;
@@ -19,37 +19,25 @@ interface YearContextValue {
 
 const YearContext = createContext<YearContextValue | null>(null);
 
-function computeAutoAY(): string {
+const AY_STORAGE_KEY = 'manualAY';
+const FY_STORAGE_KEY = 'manualFY';
+
+function computeCurrentYearLabel(): string {
   const now = new Date();
   const year = now.getFullYear();
-  const month = now.getMonth();
-
-  if (month >= 3) {
-    return `${year}-${String((year + 1) % 100).padStart(2, '0')}`;
-  }
-  return `${year - 1}-${String(year % 100).padStart(2, '0')}`;
-}
-
-function computeAutoFY(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-
-  if (month >= 3) {
+  if (now.getMonth() >= 3) {
     return `${year}-${String((year + 1) % 100).padStart(2, '0')}`;
   }
   return `${year - 1}-${String(year % 100).padStart(2, '0')}`;
 }
 
 function findClosestLabel(labels: string[], target: string): string {
-  if (labels.length === 0) return target;
-  if (labels.includes(target)) return target;
-  const targetStart = parseInt(target.slice(0, 4));
+  if (labels.length === 0 || labels.includes(target)) return target;
+  const targetStart = parseInt(target.slice(0, 4), 10);
   let best = labels[0];
   let bestDiff = Infinity;
   for (const label of labels) {
-    const start = parseInt(label.slice(0, 4));
-    const diff = Math.abs(start - targetStart);
+    const diff = Math.abs(parseInt(label.slice(0, 4), 10) - targetStart);
     if (diff < bestDiff) {
       bestDiff = diff;
       best = label;
@@ -58,69 +46,62 @@ function findClosestLabel(labels: string[], target: string): string {
   return best;
 }
 
+function readStoredOverride(key: string): string | null {
+  return localStorage.getItem(key);
+}
+
+function writeStoredOverride(key: string, value: string | null) {
+  if (value === null) localStorage.removeItem(key);
+  else localStorage.setItem(key, value);
+}
+
 export function YearProvider({ children }: { children: React.ReactNode }) {
   const [assessmentYears, setAssessmentYears] = useState<AssessmentYear[]>([]);
   const [financialYears, setFinancialYears] = useState<FinancialYear[]>([]);
-  const [autoAY, setAutoAY] = useState(computeAutoAY());
-  const [autoFY, setAutoFY] = useState(computeAutoFY());
-  const [manualAY, setManualAY] = useState<string | null>(null);
-  const [manualFY, setManualFY] = useState<string | null>(null);
+  const [currentLabel] = useState(computeCurrentYearLabel);
+  const [autoAY, setAutoAY] = useState(currentLabel);
+  const [autoFY, setAutoFY] = useState(currentLabel);
+  const [manualAY, setManualAY] = useState<string | null>(() => readStoredOverride(AY_STORAGE_KEY));
+  const [manualFY, setManualFY] = useState<string | null>(() => readStoredOverride(FY_STORAGE_KEY));
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const storedAY = localStorage.getItem('manualAY');
-    const storedFY = localStorage.getItem('manualFY');
-    if (storedAY) setManualAY(storedAY);
-    if (storedFY) setManualFY(storedFY);
-  }, []);
-
-  useEffect(() => {
-    if (manualAY !== null) localStorage.setItem('manualAY', manualAY);
-  }, [manualAY]);
-
-  useEffect(() => {
-    if (manualFY !== null) localStorage.setItem('manualFY', manualFY);
-  }, [manualFY]);
 
   useEffect(() => {
     Promise.all([
       supabase.from('assessment_years').select('*').order('start_year', { ascending: false }),
       supabase.from('financial_years').select('*').order('start_year', { ascending: false }),
-    ]).then(([ayRes, fyRes]) => {
-      const ayData = (ayRes.data ?? []) as AssessmentYear[];
-      const fyData = (fyRes.data ?? []) as FinancialYear[];
-      setAssessmentYears(ayData);
-      setFinancialYears(fyData);
+    ])
+      .then(([ayRes, fyRes]) => {
+        const ayData = (ayRes.data ?? []) as AssessmentYear[];
+        const fyData = (fyRes.data ?? []) as FinancialYear[];
+        setAssessmentYears(ayData);
+        setFinancialYears(fyData);
+        setAutoAY(findClosestLabel(ayData.map(y => y.label), currentLabel));
+        setAutoFY(findClosestLabel(fyData.map(y => y.label), currentLabel));
+      })
+      .finally(() => setLoading(false));
+  }, [currentLabel]);
 
-      const ayLabels = ayData.map(y => y.label);
-      const fyLabels = fyData.map(y => y.label);
-      const computedAY = computeAutoAY();
-      const computedFY = computeAutoFY();
-      setAutoAY(findClosestLabel(ayLabels, computedAY));
-      setAutoFY(findClosestLabel(fyLabels, computedFY));
-      setLoading(false);
-    });
+  const setSelectedAY = useCallback((val: string | null) => {
+    writeStoredOverride(AY_STORAGE_KEY, val);
+    setManualAY(val);
   }, []);
 
-  const setSelectedAY = useCallback((val: string) => setManualAY(val), []);
-  const setSelectedFY = useCallback((val: string) => setManualFY(val), []);
+  const setSelectedFY = useCallback((val: string | null) => {
+    writeStoredOverride(FY_STORAGE_KEY, val);
+    setManualFY(val);
+  }, []);
 
   const resetToAuto = useCallback(() => {
-    setManualAY(null);
-    setManualFY(null);
-    localStorage.removeItem('manualAY');
-    localStorage.removeItem('manualFY');
-  }, []);
-
-  const selectedAY = manualAY ?? autoAY;
-  const selectedFY = manualFY ?? autoFY;
+    setSelectedAY(null);
+    setSelectedFY(null);
+  }, [setSelectedAY, setSelectedFY]);
 
   return (
     <YearContext.Provider value={{
       assessmentYears,
       financialYears,
-      selectedAY,
-      selectedFY,
+      selectedAY: manualAY ?? autoAY,
+      selectedFY: manualFY ?? autoFY,
       setSelectedAY,
       setSelectedFY,
       autoAY,

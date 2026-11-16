@@ -17,8 +17,11 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import CircularProgress from '@mui/material/CircularProgress';
 import CloseIcon from '@mui/icons-material/Close';
+import MinimizeIcon from '@mui/icons-material/Minimize';
+import FolderIcon from '@mui/icons-material/Folder';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { supabase } from '../../lib/supabase';
+import { useMinimize } from '../../contexts/MinimizeContext';
 import type { PhysicalFile, FileMovement } from '../../types';
 import StatusChip from '../common/StatusChip';
 import { format, isPast } from 'date-fns';
@@ -29,11 +32,15 @@ interface FileViewDialogProps {
   onClose: () => void;
 }
 
+const WINDOW_ID = 'file-view';
+
 export default function FileViewDialog({ open, fileId, onClose }: FileViewDialogProps) {
+  const { minimize, remove } = useMinimize();
   const [file, setFile] = useState<PhysicalFile | null>(null);
   const [movements, setMovements] = useState<FileMovement[]>([]);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState(0);
+  const [minimized, setMinimized] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!fileId) return;
@@ -56,6 +63,25 @@ export default function FileViewDialog({ open, fileId, onClose }: FileViewDialog
 
   useEffect(() => { if (open && fileId) { setTab(0); loadData(); } }, [open, fileId, loadData]);
 
+  useEffect(() => {
+    if (!open) {
+      setMinimized(false);
+      remove(WINDOW_ID);
+    }
+  }, [open, remove]);
+
+  useEffect(() => () => remove(WINDOW_ID), [remove]);
+
+  function handleMinimize() {
+    minimize({
+      id: WINDOW_ID,
+      title: file?.file_name ?? 'File View',
+      icon: <FolderIcon sx={{ fontSize: 16, color: 'primary.main' }} />,
+      onRestore: () => setMinimized(false),
+    });
+    setMinimized(true);
+  }
+
   function InfoRow({ label, value }: { label: string; value?: string | null }) {
     return (
       <Box sx={{ py: 0.5, display: 'flex', gap: 1 }}>
@@ -66,10 +92,11 @@ export default function FileViewDialog({ open, fileId, onClose }: FileViewDialog
   }
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth fullScreen={false}>
-      <DialogTitle sx={{ pr: 6 }}>
+    <Dialog open={open && !minimized} onClose={onClose} maxWidth="md" fullWidth fullScreen={false}>
+      <DialogTitle sx={{ pr: 12 }}>
         {file?.file_name ?? 'File View'}
-        <IconButton onClick={onClose} sx={{ position: 'absolute', right: 8, top: 8 }}><CloseIcon /></IconButton>
+        <IconButton onClick={handleMinimize} aria-label="Minimize" sx={{ position: 'absolute', right: 48, top: 8 }}><MinimizeIcon /></IconButton>
+        <IconButton onClick={onClose} aria-label="Close" sx={{ position: 'absolute', right: 8, top: 8 }}><CloseIcon /></IconButton>
       </DialogTitle>
       <DialogContent dividers>
         {loading ? <Box display="flex" justifyContent="center" py={4}><CircularProgress /></Box>

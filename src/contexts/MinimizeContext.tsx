@@ -12,7 +12,6 @@ interface MinimizeContextValue {
   minimize: (win: MinimizedWindow) => void;
   restore: (id: string) => void;
   remove: (id: string) => void;
-  isMinimized: (id: string) => boolean;
 }
 
 const MinimizeContext = createContext<MinimizeContextValue | null>(null);
@@ -28,23 +27,16 @@ export function MinimizeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const restore = useCallback((id: string) => {
-    setMinimized(prev => {
-      const win = prev.find(w => w.id === id);
-      if (win) win.onRestore();
-      return prev.filter(w => w.id !== id);
-    });
-  }, []);
+    minimized.find(w => w.id === id)?.onRestore();
+    setMinimized(prev => prev.filter(w => w.id !== id));
+  }, [minimized]);
 
   const remove = useCallback((id: string) => {
     setMinimized(prev => prev.filter(w => w.id !== id));
   }, []);
 
-  const isMinimized = useCallback((id: string) => {
-    return minimized.some(w => w.id === id);
-  }, [minimized]);
-
   return (
-    <MinimizeContext.Provider value={{ minimized, minimize, restore, remove, isMinimized }}>
+    <MinimizeContext.Provider value={{ minimized, minimize, restore, remove }}>
       {children}
     </MinimizeContext.Provider>
   );

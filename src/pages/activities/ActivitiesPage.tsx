@@ -43,6 +43,7 @@ import ViewAgendaIcon from '@mui/icons-material/ViewAgenda';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import PersonIcon from '@mui/icons-material/Person';
 import BusinessIcon from '@mui/icons-material/Business';
+import MinimizeIcon from '@mui/icons-material/Minimize';
 import { supabase } from '../../lib/supabase';
 import type { Activity, Client, Employee, ActivityType } from '../../types';
 import PageHeader from '../../components/common/PageHeader';
@@ -50,8 +51,10 @@ import StatusChip from '../../components/common/StatusChip';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { useAuth } from '../../contexts/AuthContext';
 import { logAudit } from '../../lib/audit';
+import { useMinimize } from '../../contexts/MinimizeContext';
 import { format, isPast } from 'date-fns';
 
+const ACTIVITY_DIALOG_WINDOW_ID = 'activity-form';
 const STATUS_OPTS = ['all', 'not_started', 'in_progress', 'completed', 'on_hold', 'cancelled'];
 const PRIORITY_OPTS = ['low', 'medium', 'high', 'urgent'];
 type ViewMode = 'table' | 'list' | 'detailed';
@@ -77,6 +80,8 @@ export default function ActivitiesPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>(() => (localStorage.getItem('activitiesViewMode') as ViewMode) || 'table');
+  const { minimize, remove } = useMinimize();
+  const [dialogMinimized, setDialogMinimized] = useState(false);
   const defaultForm = { title: '', activity_type_id: '', client_id: '', assigned_employee_id: '', priority: 'medium', status: 'not_started', start_date: '', due_date: '', completion_date: '', notes: '', reminder_date: '' };
   const [form, setForm] = useState(defaultForm);
 
@@ -85,6 +90,24 @@ export default function ActivitiesPage() {
   useEffect(() => {
     localStorage.setItem('activitiesViewMode', viewMode);
   }, [viewMode]);
+
+  useEffect(() => {
+    if (!dialogOpen) {
+      setDialogMinimized(false);
+      remove(ACTIVITY_DIALOG_WINDOW_ID);
+    }
+  }, [dialogOpen, remove]);
+
+  useEffect(() => () => remove(ACTIVITY_DIALOG_WINDOW_ID), [remove]);
+
+  function handleDialogMinimize() {
+    minimize({
+      id: ACTIVITY_DIALOG_WINDOW_ID,
+      title: editActivity ? 'Edit Activity' : 'Add Activity',
+      onRestore: () => setDialogMinimized(false),
+    });
+    setDialogMinimized(true);
+  }
 
   const loadActivities = useCallback(async () => {
     setLoading(true);
@@ -375,8 +398,11 @@ export default function ActivitiesPage() {
 
       {isMobile && canEdit && <Fab color="primary" onClick={() => openEdit(null)} sx={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1200 }}><AddIcon /></Fab>}
 
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth fullScreen={isMobile}>
-        <DialogTitle>{editActivity ? 'Edit Activity' : 'Add Activity'}</DialogTitle>
+      <Dialog open={dialogOpen && !dialogMinimized} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth fullScreen={isMobile}>
+        <DialogTitle sx={{ pr: 6 }}>
+          {editActivity ? 'Edit Activity' : 'Add Activity'}
+          <IconButton onClick={handleDialogMinimize} aria-label="Minimize" sx={{ position: 'absolute', right: 8, top: 8 }}><MinimizeIcon /></IconButton>
+        </DialogTitle>
         <DialogContent dividers>
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
           <Grid container spacing={2}>
