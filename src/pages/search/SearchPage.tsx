@@ -66,7 +66,7 @@ export default function SearchPage() {
 
     const [clientsRes, filesRes, movementsRes, couriersRes, activitiesRes] = await Promise.all([
       supabase.from('clients').select('id,client_id,client_name,status,pan_number,mobile_number,email').eq('is_deleted', false).or(`client_name.ilike.%${q}%,client_id.ilike.%${q}%,pan_number.ilike.%${q}%,mobile_number.ilike.%${q}%,email.ilike.%${q}%,gst_number.ilike.%${q}%`).limit(20),
-      supabase.from('physical_files').select('id,file_id,file_name,file_subject,status,client:clients(client_name)').eq('is_deleted', false).neq('status', 'archived').or(`file_name.ilike.%${q}%,file_id.ilike.%${q}%,file_number.ilike.%${q}%,file_subject.ilike.%${q}%`).limit(20),
+      supabase.from('physical_files').select('id,file_id,file_name,file_number,file_subject,financial_year,assessment_year,status,client:clients(client_name),cabinet:cabinets(cabinet_name,cabinet_number)').eq('is_deleted', false).or(`file_name.ilike.%${q}%,file_id.ilike.%${q}%,file_number.ilike.%${q}%,file_subject.ilike.%${q}%`).limit(50),
       supabase.from('file_movements').select('id,movement_id,purpose,status,taken_date,file:physical_files(file_name)').eq('is_deleted', false).or(`movement_id.ilike.%${q}%,purpose.ilike.%${q}%`).limit(20),
       supabase.from('couriers').select('id,courier_id,sender,receiver,tracking_number,status,received_date').eq('is_deleted', false).or(`courier_id.ilike.%${q}%,tracking_number.ilike.%${q}%,sender.ilike.%${q}%,receiver.ilike.%${q}%`).limit(20),
       supabase.from('activities').select('id,activity_id,title,status,due_date,client:clients(client_name)').eq('is_deleted', false).or(`title.ilike.%${q}%,activity_id.ilike.%${q}%,notes.ilike.%${q}%`).limit(20),
@@ -140,14 +140,16 @@ export default function SearchPage() {
 
             {tab === 1 && (
               <Table size="small">
-                <TableHead><TableRow><TableCell>File ID</TableCell><TableCell>File Name</TableCell><TableCell>Subject</TableCell><TableCell>Client</TableCell><TableCell>Status</TableCell></TableRow></TableHead>
+                <TableHead><TableRow><TableCell>File Number</TableCell><TableCell>File Name</TableCell><TableCell>Subject</TableCell><TableCell>FY</TableCell><TableCell>AY</TableCell><TableCell>Cabinet</TableCell><TableCell>Status</TableCell></TableRow></TableHead>
                 <TableBody>
-                  {results.files.length === 0 ? <TableRow><TableCell colSpan={5} align="center">No files found</TableCell></TableRow>
+                  {results.files.length === 0 ? <TableRow><TableCell colSpan={7} align="center">No files found</TableCell></TableRow>
                     : results.files.map(f => <TableRow key={f.id as string} hover onClick={() => navigate(`/files/${f.id}`, { state: { from: '/search' } })} sx={{ cursor: 'pointer' }}>
-                      <TableCell><Typography variant="body2" fontWeight={600} color="primary.main">{f.file_id as string}</Typography></TableCell>
+                      <TableCell><Typography variant="body2" fontWeight={600} color="primary.main">{(f.file_number as string) || (f.file_id as string)}</Typography></TableCell>
                       <TableCell>{f.file_name as string}</TableCell>
-                      <TableCell><Typography variant="caption">{f.file_subject as string ?? '-'}</Typography></TableCell>
-                      <TableCell>{(f.client as { client_name: string } | undefined)?.client_name ?? '-'}</TableCell>
+                      <TableCell><Typography variant="caption">{(f.file_subject as string) ?? '-'}</Typography></TableCell>
+                      <TableCell>{(f.financial_year as string) ?? '-'}</TableCell>
+                      <TableCell>{(f.assessment_year as string) ?? '-'}</TableCell>
+                      <TableCell>{(f.cabinet as { cabinet_name?: string } | undefined)?.cabinet_name ?? '-'}</TableCell>
                       <TableCell><StatusChip status={f.status as string} /></TableCell>
                     </TableRow>)}
                 </TableBody>
@@ -240,7 +242,7 @@ export default function SearchPage() {
         ] as PdfColumn[]}
         rows={results ? [
           ...results.clients.map(c => ({ type: 'Client', id: c.client_id as string, name: c.client_name as string, detail: (c.mobile_number as string) ?? '-', status: c.status as string })),
-          ...results.files.map(f => ({ type: 'File', id: f.file_id as string, name: f.file_name as string, detail: (f.file_subject as string) ?? '-', status: f.status as string })),
+          ...results.files.map(f => ({ type: 'File', id: (f.file_number as string) || (f.file_id as string), name: f.file_name as string, detail: `${(f.file_subject as string) ?? '-'} | FY ${(f.financial_year as string) ?? '-'} | AY ${(f.assessment_year as string) ?? '-'}`, status: f.status as string })),
           ...results.movements.map(m => ({ type: 'Movement', id: m.movement_id as string, name: (m.file as { file_name: string } | undefined)?.file_name ?? '-', detail: (m.purpose as string) ?? '-', status: m.status as string })),
           ...results.couriers.map(c => ({ type: 'Courier', id: c.courier_id as string, name: (c.sender as string) ?? '-', detail: (c.tracking_number as string) ?? '-', status: c.status as string })),
           ...results.activities.map(a => ({ type: 'Activity', id: a.activity_id as string, name: a.title as string, detail: (a.client as { client_name: string } | undefined)?.client_name ?? '-', status: a.status as string })),
