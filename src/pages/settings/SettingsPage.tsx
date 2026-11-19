@@ -253,6 +253,7 @@ function DropdownsTab() {
   const [items, setItems] = useState<Array<Record<string, unknown>>>([]);
   const [newName, setNewName] = useState('');
   const [saving, setSaving] = useState(false);
+  const [yearError, setYearError] = useState('');
 
   const dropdowns = [
     { key: 'client_types', label: 'Client Types' },
@@ -261,6 +262,8 @@ function DropdownsTab() {
     { key: 'financial_years', label: 'Financial Years' },
     { key: 'assessment_years', label: 'Assessment Years' },
   ];
+
+  const isYearDropdown = activeDropdown === 'financial_years' || activeDropdown === 'assessment_years';
 
   useEffect(() => { loadItems(); }, [activeDropdown]);
 
@@ -271,15 +274,19 @@ function DropdownsTab() {
 
   async function addItem() {
     if (!newName.trim()) return;
+    if (isYearDropdown && !/^\d{4}-\d{2}$/.test(newName.trim())) {
+      setYearError('Use the format 2030-31.');
+      return;
+    }
     setSaving(true);
     const maxOrder = Math.max(0, ...items.map(i => i.sort_order as number));
-    if (activeDropdown === 'financial_years' || activeDropdown === 'assessment_years') {
+    if (isYearDropdown) {
       const startYear = parseInt(newName.split('-')[0]);
-      await supabase.from(activeDropdown).insert({ label: newName, start_year: isNaN(startYear) ? 0 : startYear, is_active: true, sort_order: maxOrder + 1 });
+      await supabase.from(activeDropdown).insert({ label: newName.trim(), start_year: isNaN(startYear) ? 0 : startYear, is_active: true, sort_order: maxOrder + 1 });
     } else {
       await supabase.from(activeDropdown).insert({ name: newName, sort_order: maxOrder + 1 });
     }
-    setNewName(''); setSaving(false); loadItems();
+    setNewName(''); setSaving(false); setYearError(''); loadItems();
   }
 
   async function toggleActive(item: Record<string, unknown>) {
@@ -294,11 +301,11 @@ function DropdownsTab() {
         {dropdowns.map(d => <Button key={d.key} variant={activeDropdown === d.key ? 'contained' : 'outlined'} size="small" onClick={() => setActiveDropdown(d.key)}>{d.label}</Button>)}
       </Box>
       <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-        <TextField size="small" placeholder={activeDropdown === 'financial_years' || activeDropdown === 'assessment_years' ? 'Add e.g. 2030-31...' : 'Add new item...'} value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === 'Enter' && addItem()} />
+        <TextField size="small" placeholder={isYearDropdown ? 'Add e.g. 2030-31...' : 'Add new item...'} value={newName} onChange={e => { setNewName(e.target.value); setYearError(''); }} onKeyDown={e => e.key === 'Enter' && addItem()} error={!!yearError} helperText={yearError} />
         <Button variant="contained" onClick={addItem} disabled={saving || !newName.trim()}>Add</Button>
       </Box>
       <Table size="small">
-        <TableHead><TableRow><TableCell>#</TableCell><TableCell>{activeDropdown === 'financial_years' || activeDropdown === 'assessment_years' ? 'Label' : 'Name'}</TableCell><TableCell>Active</TableCell></TableRow></TableHead>
+        <TableHead><TableRow><TableCell>#</TableCell><TableCell>{isYearDropdown ? 'Label' : 'Name'}</TableCell><TableCell>Active</TableCell></TableRow></TableHead>
         <TableBody>
           {items.map(item => <TableRow key={item.id as string} hover>
             <TableCell>{item.sort_order as number}</TableCell>

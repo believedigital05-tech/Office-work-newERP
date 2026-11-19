@@ -208,7 +208,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <Divider />
       <Box sx={{ px: 2, py: 1.5 }}>
         <Typography variant="caption" color="text.secondary" display="block" fontWeight={600}>
-          v4.3.0 — {profile?.role?.toUpperCase()}
+          v5.0.0 — {profile?.role?.toUpperCase()}
         </Typography>
       </Box>
     </Box>

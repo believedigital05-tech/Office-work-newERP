@@ -49,6 +49,7 @@ import StatusChip from '../../components/common/StatusChip';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { useAuth } from '../../contexts/AuthContext';
 import { useYear } from '../../contexts/YearContext';
+import { getNextYearLabel } from '../../lib/yearUtils';
 import { logAudit } from '../../lib/audit';
 import { format } from 'date-fns';
 import FileViewDialog from '../../components/files/FileViewDialog';
@@ -509,7 +510,7 @@ export default function FilesPage() {
               </TextField>
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField select label="Financial Year" value={form.financial_year} onChange={e => setForm(p => ({ ...p, financial_year: e.target.value }))} fullWidth size="small">
+              <TextField select label="Financial Year" value={form.financial_year} onChange={e => setForm(p => ({ ...p, financial_year: e.target.value, assessment_year: e.target.value ? getNextYearLabel(e.target.value) : p.assessment_year }))} fullWidth size="small">
                 <MenuItem value="">-- None --</MenuItem>
                 {financialYears.map(y => <MenuItem key={y.id} value={y.label}>{y.label}</MenuItem>)}
               </TextField>
