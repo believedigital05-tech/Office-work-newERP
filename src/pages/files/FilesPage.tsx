@@ -32,9 +32,7 @@ import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
-import Grid from '@mui/material/Grid';
 import Alert from '@mui/material/Alert';
-import Autocomplete from '@mui/material/Autocomplete';
 import Fab from '@mui/material/Fab';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
@@ -49,24 +47,17 @@ import StatusChip from '../../components/common/StatusChip';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { useAuth } from '../../contexts/AuthContext';
 import { useYear } from '../../contexts/YearContext';
-import { getNextYearLabel } from '../../lib/yearUtils';
 import { logAudit } from '../../lib/audit';
 import { format } from 'date-fns';
 import FileViewDialog from '../../components/files/FileViewDialog';
+import FileDialog from '../../components/files/FileDialog';
 import PdfExportDialog, { type PdfColumn, type PdfRow } from '../../components/common/PdfExportDialog';
 
 const STATUS_OPTIONS = ['all', 'available', 'in_use', 'sent_outside', 'archived', 'missing', 'disposed'];
 
-const defaultForm = {
-  file_number: '', file_name: '', file_subject: '', client_id: '',
-  assessment_year: '', financial_year: '',
-  cabinet_id: '', shelf: '', rack: '',
-  current_holder_id: '', status: 'available', remarks: '',
-};
-
 export default function FilesPage() {
   const { profile, user } = useAuth();
-  const { selectedAY, selectedFY, assessmentYears, financialYears } = useYear();
+  const { assessmentYears, financialYears } = useYear();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [files, setFiles] = useState<PhysicalFile[]>([]);
@@ -74,12 +65,17 @@ export default function FilesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [subjectSearch, setSubjectSearch] = useState('');
+  const [numberFilter, setNumberFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [clientFilter, setClientFilter] = useState('all');
   const [ayFilter, setAyFilter] = useState('all');
   const [fyFilter, setFyFilter] = useState('all');
   const [cabinetFilter, setCabinetFilter] = useState('all');
   const [holderFilter, setHolderFilter] = useState('all');
+  const [createdFrom, setCreatedFrom] = useState('');
+  const [createdTo, setCreatedTo] = useState('');
+  const [updatedFrom, setUpdatedFrom] = useState('');
+  const [updatedTo, setUpdatedTo] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -88,9 +84,6 @@ export default function FilesPage() {
   const [cabinets, setCabinets] = useState<Cabinet[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [form, setForm] = useState(defaultForm);
   const [printOpen, setPrintOpen] = useState(false);
   const [printMode, setPrintMode] = useState<'filtered' | 'cabinet'>('filtered');
   const [printing, setPrinting] = useState(false);
@@ -114,13 +107,18 @@ export default function FilesPage() {
     if (fyFilter !== 'all') query = query.eq('financial_year', fyFilter);
     if (cabinetFilter !== 'all') query = query.eq('cabinet_id', cabinetFilter);
     if (holderFilter !== 'all') query = query.eq('current_holder_id', holderFilter);
+    if (numberFilter) query = query.ilike('file_number', `%${numberFilter}%`);
+    if (createdFrom) query = query.gte('created_at', `${createdFrom}T00:00:00`);
+    if (createdTo) query = query.lte('created_at', `${createdTo}T23:59:59`);
+    if (updatedFrom) query = query.gte('updated_at', `${updatedFrom}T00:00:00`);
+    if (updatedTo) query = query.lte('updated_at', `${updatedTo}T23:59:59`);
     if (search) query = query.or(`file_name.ilike.%${search}%,file_id.ilike.%${search}%,file_number.ilike.%${search}%`);
     if (subjectSearch) query = query.ilike('file_subject', `%${subjectSearch}%`);
     const { data, count } = await query;
     setFiles((data as PhysicalFile[]) ?? []);
     setTotal(count ?? 0);
     setLoading(false);
-  }, [page, rowsPerPage, search, subjectSearch, statusFilter, clientFilter, ayFilter, fyFilter, cabinetFilter, holderFilter]);
+  }, [page, rowsPerPage, search, subjectSearch, numberFilter, statusFilter, clientFilter, ayFilter, fyFilter, cabinetFilter, holderFilter, createdFrom, createdTo, updatedFrom, updatedTo]);
 
   useEffect(() => { loadFiles(); }, [loadFiles]);
 
@@ -132,53 +130,7 @@ export default function FilesPage() {
 
   function openEdit(file: PhysicalFile | null) {
     setEditFile(file);
-    if (file) {
-      setForm({
-        file_number: file.file_number, file_name: file.file_name,
-        file_subject: file.file_subject ?? '',
-        client_id: file.client_id ?? '', cabinet_id: file.cabinet_id ?? '',
-        shelf: file.shelf ?? '', rack: file.rack ?? '',
-        current_holder_id: file.current_holder_id ?? '', status: file.status, remarks: file.remarks ?? '',
-        assessment_year: file.assessment_year ?? '', financial_year: file.financial_year ?? '',
-      });
-    } else {
-      setForm({ ...defaultForm, assessment_year: selectedAY, financial_year: selectedFY });
-    }
-    setError('');
     setDialogOpen(true);
-  }
-
-  async function handleSave() {
-    if (!form.file_name.trim()) { setError('File name is required.'); return; }
-    if (!form.cabinet_id) { setError('Cabinet selection is required.'); return; }
-    if (form.file_subject && form.file_subject.trim().length > 200) { setError('File Subject must be 200 characters or fewer.'); return; }
-    setSaving(true);
-    setError('');
-    try {
-      const payload = {
-        ...form,
-        file_subject: form.file_subject.trim() || null,
-        assessment_year: form.assessment_year || null,
-        financial_year: form.financial_year || null,
-        client_id: form.client_id || null,
-        cabinet_id: form.cabinet_id || null,
-        current_holder_id: form.current_holder_id || null,
-      };
-      if (editFile) {
-        await supabase.from('physical_files').update({ ...payload, updated_by: user?.id, updated_at: new Date().toISOString() }).eq('id', editFile.id);
-        await logAudit({ action: 'UPDATE', module: 'files', record_id: editFile.id, record_display: form.file_name }, user?.id, profile?.full_name);
-      } else {
-        const fileId = `FL${Date.now().toString().slice(-6)}`;
-        const { data } = await supabase.from('physical_files').insert({ ...payload, file_id: fileId, created_by: user?.id, updated_by: user?.id }).select().single();
-        await logAudit({ action: 'CREATE', module: 'files', record_id: (data as PhysicalFile)?.id, record_display: form.file_name }, user?.id, profile?.full_name);
-      }
-      setDialogOpen(false);
-      loadFiles();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Save failed');
-    } finally {
-      setSaving(false);
-    }
   }
 
   async function handleDelete(reason?: string) {
@@ -192,16 +144,21 @@ export default function FilesPage() {
   function clearFilters() {
     setSearch('');
     setSubjectSearch('');
+    setNumberFilter('');
     setStatusFilter('all');
     setClientFilter('all');
     setAyFilter('all');
     setFyFilter('all');
     setCabinetFilter('all');
     setHolderFilter('all');
+    setCreatedFrom('');
+    setCreatedTo('');
+    setUpdatedFrom('');
+    setUpdatedTo('');
     setPage(0);
   }
 
-  const hasActiveFilters = search || subjectSearch || statusFilter !== 'all' || clientFilter !== 'all' || ayFilter !== 'all' || fyFilter !== 'all' || cabinetFilter !== 'all' || holderFilter !== 'all';
+  const hasActiveFilters = search || subjectSearch || numberFilter || statusFilter !== 'all' || clientFilter !== 'all' || ayFilter !== 'all' || fyFilter !== 'all' || cabinetFilter !== 'all' || holderFilter !== 'all' || createdFrom || createdTo || updatedFrom || updatedTo;
 
   function buildPrintHtml(title: string, sections: { heading: string; rows: PhysicalFile[] }[]): string {
     const today = format(new Date(), 'dd MMM yyyy');
@@ -356,6 +313,12 @@ export default function FilesPage() {
               size="small" sx={{ minWidth: { xs: '100%', sm: 180 } }}
               InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }}
             />
+            <TextField
+              placeholder="File No..."
+              label="File Number"
+              value={numberFilter} onChange={e => { setNumberFilter(e.target.value); setPage(0); }}
+              size="small" sx={{ minWidth: { xs: '100%', sm: 150 } }}
+            />
           </Stack>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} flexWrap="wrap" useFlexGap>
             <TextField select value={clientFilter} onChange={e => { setClientFilter(e.target.value); setPage(0); }} size="small" label="Client" sx={{ minWidth: 150 }}>
@@ -381,6 +344,22 @@ export default function FilesPage() {
               <MenuItem value="all">All Holders</MenuItem>
               {employees.map(e => <MenuItem key={e.id} value={e.id}>{e.full_name}</MenuItem>)}
             </TextField>
+            <TextField
+              label="Created From" type="date" value={createdFrom} onChange={e => { setCreatedFrom(e.target.value); setPage(0); }}
+              size="small" sx={{ minWidth: 150 }} InputLabelProps={{ shrink: true }}
+            />
+            <TextField
+              label="Created To" type="date" value={createdTo} onChange={e => { setCreatedTo(e.target.value); setPage(0); }}
+              size="small" sx={{ minWidth: 150 }} InputLabelProps={{ shrink: true }}
+            />
+            <TextField
+              label="Updated From" type="date" value={updatedFrom} onChange={e => { setUpdatedFrom(e.target.value); setPage(0); }}
+              size="small" sx={{ minWidth: 150 }} InputLabelProps={{ shrink: true }}
+            />
+            <TextField
+              label="Updated To" type="date" value={updatedTo} onChange={e => { setUpdatedTo(e.target.value); setPage(0); }}
+              size="small" sx={{ minWidth: 150 }} InputLabelProps={{ shrink: true }}
+            />
             {hasActiveFilters && (
               <Button startIcon={<ClearIcon />} onClick={clearFilters} size="small" sx={{ alignSelf: 'center', whiteSpace: 'nowrap' }}>Clear Filters</Button>
             )}
@@ -480,77 +459,7 @@ export default function FilesPage() {
       {isMobile && canEdit && <Fab color="primary" onClick={() => openEdit(null)} sx={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1200 }}><AddIcon /></Fab>}
       {isMobile && <Fab color="secondary" onClick={() => setPrintOpen(true)} sx={{ position: 'fixed', bottom: 24, right: 88, zIndex: 1200 }} size="medium"><PrintIcon /></Fab>}
 
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth fullScreen={isMobile}>
-        <DialogTitle>{editFile ? 'Edit File' : 'Add New File'}</DialogTitle>
-        <DialogContent dividers>
-          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField label="File Name *" value={form.file_name} onChange={e => setForm(p => ({ ...p, file_name: e.target.value }))} fullWidth size="small" />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField label="File Number" value={form.file_number} onChange={e => setForm(p => ({ ...p, file_number: e.target.value }))} fullWidth size="small" />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField label="File Subject" value={form.file_subject} onChange={e => setForm(p => ({ ...p, file_subject: e.target.value }))} fullWidth size="small" inputProps={{ maxLength: 200 }} />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <Autocomplete
-                options={clients}
-                getOptionLabel={c => `${c.client_id} - ${c.client_name}`}
-                value={clients.find(c => c.id === form.client_id) ?? null}
-                onChange={(_, v) => setForm(p => ({ ...p, client_id: v?.id ?? '' }))}
-                renderInput={params => <TextField {...params} label="Client" size="small" />}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField select label="Assessment Year" value={form.assessment_year} onChange={e => setForm(p => ({ ...p, assessment_year: e.target.value }))} fullWidth size="small">
-                <MenuItem value="">-- None --</MenuItem>
-                {assessmentYears.map(y => <MenuItem key={y.id} value={y.label}>{y.label}</MenuItem>)}
-              </TextField>
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField select label="Financial Year" value={form.financial_year} onChange={e => setForm(p => ({ ...p, financial_year: e.target.value, assessment_year: e.target.value ? getNextYearLabel(e.target.value) : p.assessment_year }))} fullWidth size="small">
-                <MenuItem value="">-- None --</MenuItem>
-                {financialYears.map(y => <MenuItem key={y.id} value={y.label}>{y.label}</MenuItem>)}
-              </TextField>
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField select label="Status" value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value }))} fullWidth size="small">
-                {STATUS_OPTIONS.filter(s => s !== 'all').map(s => <MenuItem key={s} value={s}>{s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</MenuItem>)}
-              </TextField>
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField select required label="Cabinet *" value={form.cabinet_id} onChange={e => setForm(p => ({ ...p, cabinet_id: e.target.value }))} fullWidth size="small">
-                <MenuItem value="">-- Select Cabinet --</MenuItem>
-                {cabinets.map(c => <MenuItem key={c.id} value={c.id}>{c.cabinet_name}{c.cabinet_number ? ` (#${c.cabinet_number})` : ''}</MenuItem>)}
-              </TextField>
-            </Grid>
-            <Grid size={6}>
-              <TextField label="Shelf" value={form.shelf} onChange={e => setForm(p => ({ ...p, shelf: e.target.value }))} fullWidth size="small" />
-            </Grid>
-            <Grid size={6}>
-              <TextField label="Rack" value={form.rack} onChange={e => setForm(p => ({ ...p, rack: e.target.value }))} fullWidth size="small" />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField select label="Current Holder" value={form.current_holder_id} onChange={e => setForm(p => ({ ...p, current_holder_id: e.target.value }))} fullWidth size="small">
-                <MenuItem value="">-- None --</MenuItem>
-                {employees.map(e => <MenuItem key={e.id} value={e.id}>{e.full_name}</MenuItem>)}
-              </TextField>
-            </Grid>
-            <Grid size={12}>
-              <TextField label="Remarks" value={form.remarks} onChange={e => setForm(p => ({ ...p, remarks: e.target.value }))} fullWidth size="small" multiline rows={2} />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleSave} variant="contained" disabled={saving}
-            startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}>
-            {editFile ? 'Save' : 'Add File'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <FileDialog open={dialogOpen} file={editFile} onClose={() => setDialogOpen(false)} onSaved={loadFiles} />
 
       <ConfirmDialog
         open={deleteDialog.open}
