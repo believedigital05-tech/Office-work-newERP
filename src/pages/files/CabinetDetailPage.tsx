@@ -20,6 +20,7 @@ import LinearProgress from '@mui/material/LinearProgress';
 import Stack from '@mui/material/Stack';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
+import CardActions from '@mui/material/CardActions';
 import Tooltip from '@mui/material/Tooltip';
 import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Link from '@mui/material/Link';
@@ -35,6 +36,7 @@ import { supabase } from '../../lib/supabase';
 import type { Cabinet, PhysicalFile, Client, Employee } from '../../types';
 import StatusChip from '../../components/common/StatusChip';
 import FileViewDialog from '../../components/files/FileViewDialog';
+import FileDialog from '../../components/files/FileDialog';
 import { useAuth } from '../../contexts/AuthContext';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
@@ -68,6 +70,8 @@ export default function CabinetDetailPage() {
   const [viewOpen, setViewOpen] = useState(false);
   const [viewFileId, setViewFileId] = useState<string | null>(null);
   const [pdfOpen, setPdfOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editFile, setEditFile] = useState<PhysicalFile | null>(null);
 
   const loadData = useCallback(async () => {
     if (!id) return;
@@ -268,6 +272,11 @@ export default function CabinetDetailPage() {
                   </Typography>
                   {f.shelf && <Typography variant="caption" color="text.secondary">Shelf {f.shelf}</Typography>}
                 </CardContent>
+                {canEdit && (
+                  <CardActions onClick={(e) => e.stopPropagation()}>
+                    <IconButton size="small" onClick={() => { setEditFile(f); setEditOpen(true); }}><EditIcon fontSize="small" /></IconButton>
+                  </CardActions>
+                )}
               </Card>
             ))}
           {total > rowsPerPage && (
@@ -316,7 +325,7 @@ export default function CabinetDetailPage() {
                       <TableCell><Typography variant="body2">{f.last_movement_date ? format(new Date(f.last_movement_date), 'dd MMM yy') : '-'}</Typography></TableCell>
                       <TableCell align="right" onClick={(e) => e.stopPropagation()}>
                         <Tooltip title="View"><IconButton size="small" onClick={() => { setViewFileId(f.id); setViewOpen(true); }}><VisibilityIcon fontSize="small" /></IconButton></Tooltip>
-                        {canEdit && <Tooltip title="Edit"><IconButton size="small" onClick={() => navigate(`/files/${f.id}`, { state: { from: `/cabinets/${id}` } })}><EditIcon fontSize="small" /></IconButton></Tooltip>}
+                        {canEdit && <Tooltip title="Edit"><IconButton size="small" onClick={() => { setEditFile(f); setEditOpen(true); }}><EditIcon fontSize="small" /></IconButton></Tooltip>}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -334,6 +343,8 @@ export default function CabinetDetailPage() {
       )}
 
       <FileViewDialog open={viewOpen} fileId={viewFileId} onClose={() => setViewOpen(false)} />
+
+      <FileDialog open={editOpen} file={editFile} onClose={() => setEditOpen(false)} onSaved={loadData} />
 
       <PdfExportDialog
         open={pdfOpen}

@@ -16,7 +16,6 @@ import MenuItem from '@mui/material/MenuItem';
 import Tooltip from '@mui/material/Tooltip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Typography from '@mui/material/Typography';
-import Chip from '@mui/material/Chip';
 import Fab from '@mui/material/Fab';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
@@ -42,6 +41,13 @@ import ClientDialog from './ClientDialog';
 import { useAuth } from '../../contexts/AuthContext';
 import { logAudit } from '../../lib/audit';
 import * as XLSX from 'xlsx';
+import Checkbox from '@mui/material/Checkbox';
+import Alert from '@mui/material/Alert';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import Chip from '@mui/material/Chip';
 
 const STATUS_OPTIONS = ['all', 'active', 'inactive', 'onboarding', 'exited'];
 
@@ -61,6 +67,12 @@ export default function ClientsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editClient, setEditClient] = useState<Client | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; client: Client | null }>({ open: false, client: null });
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [confirmBulkOpen, setConfirmBulkOpen] = useState(false);
+  const [bulkStatus, setBulkStatus] = useState('active');
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [bulkResult, setBulkResult] = useState<{ ok: number; failed: number } | null>(null);
 
   const canEdit = profile?.role === 'admin' || profile?.role === 'manager';
   const canDelete = profile?.role === 'admin';
@@ -122,6 +134,60 @@ export default function ClientsPage() {
   function openAdd() { setEditClient(null); setDialogOpen(true); }
   function openEdit(client: Client) { setEditClient(client); setDialogOpen(true); }
 
+  function toggleSelected(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  const allOnPageSelected = clients.length > 0 && clients.every(c => selectedIds.has(c.id));
+
+  function toggleSelectAll() {
+    if (allOnPageSelected) {
+      const pageIds = new Set(clients.map(c => c.id));
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        pageIds.forEach(pid => next.delete(pid));
+        return next;
+      });
+    } else {
+      setSelectedIds(prev => new Set([...prev, ...clients.map(c => c.id)]));
+    }
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
+
+  async function applyBulkStatus() {
+    setBulkUpdating(true);
+    setBulkResult(null);
+    const ids = Array.from(selectedIds);
+    let ok = 0;
+    let failed = 0;
+    const stamp = new Date().toISOString();
+    const ref = `BULK-${Date.now().toString(36).toUpperCase()}`;
+    for (const cid of ids) {
+      const client = clients.find(c => c.id === cid);
+      const { error } = await supabase.from('clients').update({ status: bulkStatus, updated_by: user?.id, updated_at: stamp }).eq('id', cid);
+      if (error) { failed += 1; continue; }
+      ok += 1;
+      await logAudit({
+        action: 'BULK_STATUS_UPDATE', module: 'clients', record_id: cid,
+        record_display: client?.client_name ?? cid,
+        old_values: { status: client?.status ?? null },
+        new_values: { status: bulkStatus, bulk_ref: ref },
+      }, user?.id, profile?.full_name);
+    }
+    setBulkResult({ ok, failed });
+    setBulkUpdating(false);
+    setConfirmBulkOpen(false);
+    clearSelection();
+    loadClients();
+  }
+
   return (
     <Box sx={{ pb: { xs: 10, md: 0 } }}>
       <PageHeader
@@ -130,6 +196,11 @@ export default function ClientsPage() {
         action={
           !isMobile ? (
             <Box sx={{ display: 'flex', gap: 1 }}>
+              {selectedIds.size > 0 && canEdit && (
+                <Button variant="contained" color="warning" onClick={() => { setBulkResult(null); setBulkOpen(true); }}>
+                  Bulk Update Status ({selectedIds.size})
+                </Button>
+              )}
               <Button startIcon={<FileDownloadIcon />} variant="outlined" size="small" onClick={handleExport}>Export</Button>
               {canEdit && <Button startIcon={<AddIcon />} variant="contained" onClick={openAdd}>Add Client</Button>}
             </Box>
@@ -214,6 +285,7 @@ export default function ClientsPage() {
             <Table size="small" sx={{ minWidth: 900 }}>
               <TableHead>
                 <TableRow>
+                  {canEdit && <TableCell padding="checkbox"><Checkbox size="small" indeterminate={selectedIds.size > 0 && !allOnPageSelected} checked={allOnPageSelected} onChange={toggleSelectAll} /></TableCell>}
                   <TableCell>Client ID</TableCell>
                   <TableCell>Client Name</TableCell>
                   <TableCell>Type</TableCell>
@@ -230,7 +302,8 @@ export default function ClientsPage() {
                 ) : clients.length === 0 ? (
                   <TableRow><TableCell colSpan={8} align="center" sx={{ py: 4 }}><Typography color="text.secondary">No clients found</Typography></TableCell></TableRow>
                 ) : clients.map((client) => (
-                  <TableRow key={client.id} hover>
+                  <TableRow key={client.id} hover selected={selectedIds.has(client.id)}>
+                    {canEdit && <TableCell padding="checkbox"><Checkbox size="small" checked={selectedIds.has(client.id)} onChange={() => toggleSelected(client.id)} /></TableCell>}
                     <TableCell><Typography variant="body2" fontWeight={600} color="primary.main">{client.client_id}</Typography></TableCell>
                     <TableCell>
                       <Typography variant="body2" fontWeight={500} component="span" sx={{ cursor: 'pointer', color: 'primary.main', '&:hover': { textDecoration: 'underline' } }} onClick={() => navigate(`/clients/${client.id}`)}>{client.client_name}</Typography>
@@ -282,6 +355,36 @@ export default function ClientsPage() {
         client={editClient}
         onClose={() => setDialogOpen(false)}
         onSaved={loadClients}
+      />
+
+      <Dialog open={bulkOpen} onClose={() => setBulkOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Bulk Update Status</DialogTitle>
+        <DialogContent dividers>
+          {bulkResult && (
+            <Alert severity={bulkResult.failed === 0 ? 'success' : 'warning'} sx={{ mb: 2 }}>
+              Updated {bulkResult.ok} client{bulkResult.ok !== 1 ? 's' : ''}
+              {bulkResult.failed > 0 ? `, ${bulkResult.failed} failed` : ''}.
+            </Alert>
+          )}
+          <Typography variant="body2" sx={{ mb: 2 }}>{selectedIds.size} client{selectedIds.size !== 1 ? 's' : ''} selected.</Typography>
+          <TextField select label="New Status" value={bulkStatus} onChange={e => setBulkStatus(e.target.value)} fullWidth size="small">
+            {['active', 'inactive', 'onboarding', 'exited'].map(s => <MenuItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</MenuItem>)}
+          </TextField>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBulkOpen(false)}>Cancel</Button>
+          <Button variant="contained" disabled={bulkUpdating || selectedIds.size === 0} onClick={() => setConfirmBulkOpen(true)}>Update</Button>
+        </DialogActions>
+      </Dialog>
+
+      <ConfirmDialog
+        open={confirmBulkOpen}
+        title="Confirm Bulk Update"
+        message={`You are about to update the status of ${selectedIds.size} selected client${selectedIds.size !== 1 ? 's' : ''}. Do you want to continue?`}
+        confirmLabel="Update"
+        confirmColor="warning"
+        onConfirm={applyBulkStatus}
+        onCancel={() => setConfirmBulkOpen(false)}
       />
 
       <ConfirmDialog
